@@ -1,55 +1,51 @@
 # ==============================================================================
-# QUANT SCANNER PRO — INSTITUTIONAL TERMINAL v5.0 (BLACK & GOLD EDITION)
-# Multi-Asset Quantitative Scanner | Random Forest Meta-Labeling | Half-Kelly |
-# Real-Time Fundamental News & Pricing Power Catalysts | Fundamental Risk Matrix
+# QUANT SCANNER PRO — TERMINAL INSTITUCIONAL & GENERADOR DE INFORMES v6.0
+# Sistema de Escaneo Cuantitativo, Riesgo Monte Carlo y Generación de Factsheet PDF/HTML
 # ==============================================================================
 
 import streamlit as st
+import streamlit.components.v1 as components
 import yfinance as yf
 import pandas as pd
 import numpy as np
 import math
 import requests
+import base64
 import plotly.graph_objects as go
 import plotly.express as px
 from sklearn.ensemble import RandomForestClassifier
 from datetime import datetime
 
 # ------------------------------------------------------------------------------
-# CONFIGURACIÓN DE PÁGINA Y ESTILOS CSS CUSTOM (BLACK & GOLD MINIMALIST)
+# CONFIGURACIÓN DE PÁGINA Y ESTILOS CSS CUSTOM
 # ------------------------------------------------------------------------------
 st.set_page_config(
-    page_title="Quant Scanner Pro | Institutional Terminal",
+    page_title="Quant Scanner Pro | Terminal de Gestión",
     page_icon="⚡",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Estilo Neón Dark Gold Lujo Minimalista
 st.markdown("""
 <style>
-    /* Fondo principal obsidiana */
     .stApp {
         background-color: #08080a !important;
         color: #e4e4e7 !important;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     }
     
-    /* Headers en blanco metálico */
     h1, h2, h3, h4 {
         color: #f4f4f5 !important;
         font-weight: 600 !important;
         letter-spacing: -0.5px !important;
     }
     
-    /* Subtítulos en acento dorado */
     .gold-accent {
         color: #d4af37 !important;
         font-weight: 600;
         letter-spacing: 0.5px;
     }
     
-    /* Tarjetas de Métricas */
     div[data-testid="stMetric"], .stMetric {
         background: #111115 !important;
         border: 1px solid rgba(212, 175, 55, 0.22) !important;
@@ -61,7 +57,7 @@ st.markdown("""
     [data-testid="stMetricValue"] {
         color: #d4af37 !important;
         font-weight: 700 !important;
-        font-size: 1.5rem !important;
+        font-size: 1.4rem !important;
         font-family: 'SF Mono', 'Roboto Mono', monospace !important;
     }
     
@@ -72,7 +68,6 @@ st.markdown("""
         letter-spacing: 0.8px !important;
     }
     
-    /* Pestañas (Tabs) estilo Terminal */
     .stTabs [data-baseweb="tab-list"] {
         gap: 6px;
         background-color: #0c0c0f;
@@ -98,7 +93,6 @@ st.markdown("""
         font-weight: 600 !important;
     }
     
-    /* Botones Dorados */
     .stButton > button {
         background: linear-gradient(180deg, #1f1a0e 0%, #12100a 100%) !important;
         color: #d4af37 !important;
@@ -115,7 +109,6 @@ st.markdown("""
         box-shadow: 0 0 12px rgba(212, 175, 55, 0.4) !important;
     }
     
-    /* Tarjetas de Noticias */
     .news-card {
         background: #111116;
         border: 1px solid #27272a;
@@ -125,37 +118,41 @@ st.markdown("""
         margin-bottom: 10px;
     }
     
-    /* Sidebar */
     section[data-testid="stSidebar"] {
         background-color: #0b0b0e !important;
         border-right: 1px solid #1a1a20 !important;
     }
     
-    /* Inputs y Textareas */
     .stTextInput input, .stNumberInput input, .stTextArea textarea, .stSelectbox div[data-baseweb="select"] {
         background-color: #111116 !important;
         color: #f4f4f5 !important;
         border: 1px solid #27272a !important;
         border-radius: 4px !important;
     }
-    
-    .stTextInput input:focus, .stTextArea textarea:focus {
-        border-color: #d4af37 !important;
-        box-shadow: 0 0 6px rgba(212, 175, 55, 0.3) !important;
-    }
 </style>
 """, unsafe_allow_html=True)
 
 # ------------------------------------------------------------------------------
-# PANEL LATERAL CONFIGURACIÓN (SIDEBAR INSTITUCIONAL)
+# INICIALIZACIÓN DE MEMORIA DE SESIÓN (SESSION STATE)
+# ------------------------------------------------------------------------------
+if 'scan_results' not in st.session_state:
+    st.session_state['scan_results'] = None
+
+ALL_TICKERS_DEFAULT = [
+    "SPY", "QQQ", "NVDA", "AAPL", "MSFT", "AMZN", "TSLA", "META", 
+    "BTC-USD", "MELI", "OKLO", "QCOM", "AVGO", "YPF", "TGS", "MU", 
+    "NU", "ASML", "IREN", "VIST", "VT", "PAMP", "IBIT", "TSM", "SPCX", "BRK-B"
+]
+
+# ------------------------------------------------------------------------------
+# PANEL LATERAL (SIDEBAR)
 # ------------------------------------------------------------------------------
 st.sidebar.markdown("### ⚡ QUANT SCANNER CONTROL")
-st.sidebar.caption("Parámetros Cuantitativos de Gestión de Portafolio")
+st.sidebar.caption("Parámetros de Portafolio y Riesgo")
 
-st.sidebar.markdown("##### 🎛️ Parámetros de Portafolio")
-capital = st.sidebar.number_input("Capital Portfolio AUM ($ USD)", value=100000.0, step=5000.0)
+capital = st.sidebar.number_input("Capital Portfolio ($ USD)", value=100000.0, step=5000.0)
 riesgo_base_pct = st.sidebar.slider("Riesgo Base por Trade (%)", min_value=0.25, max_value=3.0, value=1.0, step=0.25)
-prob_threshold = st.sidebar.slider("Umbral Confianza p-hat (ML)", min_value=0.40, max_value=0.70, value=0.50, step=0.01)
+prob_threshold = st.sidebar.slider("Umbral Confianza ML (p-hat)", min_value=0.40, max_value=0.70, value=0.50, step=0.01)
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("##### 🛡️ Cobertura & Régimen Macro")
@@ -163,7 +160,7 @@ activar_filtro_regimen = st.sidebar.checkbox("Filtro Régimen Macro (SPY > SMA20
 usar_kelly_dinamico = st.sidebar.checkbox("Kelly Fraccionado Dinámico", value=True)
 
 st.sidebar.markdown("---")
-st.sidebar.markdown("##### 📱 Telegram OEMS Gateway")
+st.sidebar.markdown("##### 📱 Telegram Gateway")
 telegram_token = st.sidebar.text_input("Bot Token", type="password")
 telegram_chat_id = st.sidebar.text_input("Chat ID")
 
@@ -180,20 +177,15 @@ with col_h2:
 st.markdown("---")
 
 # ------------------------------------------------------------------------------
-# DATOS CACHEADOS MACRO Y FUNDAMENTALES
+# FUNCIONES AUXILIARES Y DE DATOS CACHEADOS
 # ------------------------------------------------------------------------------
 @st.cache_data(ttl=1800)
 def obtener_datos_macro():
     tickers = {
-        "WTI Oil": "CL=F",
-        "Brent Oil": "BZ=F",
-        "Nat Gas": "NG=F",
-        "Sector Energía": "XLE",
-        "Servicios Petroleros": "OIH",
-        "Bono 10Y EE.UU.": "^TNX",
-        "VIX Volatilidad": "^VIX",
-        "Dólar DXY": "DX-Y.NYB",
-        "Oro": "GC=F"
+        "WTI Oil": "CL=F", "Brent Oil": "BZ=F", "Nat Gas": "NG=F",
+        "Sector Energía": "XLE", "Servicios Petroleros": "OIH",
+        "Bono 10Y EE.UU.": "^TNX", "VIX Volatilidad": "^VIX",
+        "Dólar DXY": "DX-Y.NYB", "Oro": "GC=F"
     }
     datos = {}
     for nombre, symbol in tickers.items():
@@ -208,10 +200,8 @@ def obtener_datos_macro():
                 var_pct = ((last_price - prev_price) / prev_price) * 100
                 
                 datos[nombre] = {
-                    "symbol": symbol,
-                    "precio": round(last_price, 2),
-                    "var_pct": round(var_pct, 2),
-                    "df": df[['Close']].tail(252)
+                    "symbol": symbol, "precio": round(last_price, 2),
+                    "var_pct": round(var_pct, 2), "df": df[['Close']].tail(252)
                 }
         except Exception:
             continue
@@ -255,29 +245,258 @@ def obtener_noticias_ticker(ticker):
 @st.cache_data(ttl=3600)
 def obtener_fundamentales_ticker(ticker):
     try:
-        info = yf.Ticker(ticker).info
+        tk = yf.Ticker(ticker)
+        info = tk.info or {}
         gross_m = info.get("grossMargins", None)
         pricing_power = "ALTO 🟢" if (gross_m or 0) >= 0.40 else ("MEDIO 🟡" if (gross_m or 0) >= 0.20 else "N/A ⚪")
+        
+        mcap = info.get("marketCap", 0)
+        fcf = info.get("freeCashflow", 0)
         
         return {
             "Ticker": ticker,
             "Sector": info.get("sector", "N/A"),
-            "Market Cap ($B)": round(info.get("marketCap", 0) / 1e9, 2) if info.get("marketCap") else "N/A",
+            "Market Cap ($B)": round(mcap / 1e9, 2) if mcap else "N/A",
             "Forward P/E": round(info.get("forwardPE", 0), 2) if info.get("forwardPE") else "N/A",
             "Gross Margin (%)": f"{round(gross_m * 100, 1)}%" if gross_m is not None else "N/A",
             "Profit Margin (%)": f"{round(info.get('profitMargins', 0) * 100, 1)}%" if info.get("profitMargins") is not None else "N/A",
             "Debt / Equity": round(info.get("debtToEquity", 0), 2) if info.get("debtToEquity") else "N/A",
-            "Free Cash Flow ($B)": round(info.get("freeCashflow", 0) / 1e9, 2) if info.get("freeCashflow") else "N/A",
+            "Free Cash Flow ($B)": round(fcf / 1e9, 2) if fcf else "N/A",
             "Pricing Power Index": pricing_power
         }
     except Exception:
-        return None
+        return {
+            "Ticker": ticker, "Sector": "N/A", "Market Cap ($B)": "N/A",
+            "Forward P/E": "N/A", "Gross Margin (%)": "N/A", "Profit Margin (%)": "N/A",
+            "Debt / Equity": "N/A", "Free Cash Flow ($B)": "N/A", "Pricing Power Index": "N/A ⚪"
+        }
+
+# ------------------------------------------------------------------------------
+# GENERADOR DE INFORME HTML EJECUTIVO (ESTILO DOCUMENTO DE INVERSIÓN)
+# ------------------------------------------------------------------------------
+def generar_informe_html_ejecutivo(resultados_scan, capital_total, regimen_data):
+    fecha_actual = datetime.now().strftime("%d de %B de %Y — %H:%M UTC")
+    df_res = pd.DataFrame(resultados_scan).sort_values(by=["_prioridad", "Var 1D %"], ascending=[True, False])
+    df_aprobados = df_res[df_res['_prioridad'] == 1]
+    df_rechazados = df_res[df_res['_prioridad'] > 1]
+    
+    capital_asignado = df_aprobados['Allocation ($)'].sum() if not df_aprobados.empty else 0.0
+    liquidez_restante = capital_total - capital_asignado
+
+    # Construcción de filas de tabla aprobados
+    filas_aprobados_html = ""
+    if not df_aprobados.empty:
+        for _, r in df_aprobados.iterrows():
+            filas_aprobados_html += f"""
+            <tr>
+                <td><strong>{r['Ticker']}</strong></td>
+                <td>${r['Precio']:,.2f} ({r['Var 1D %']}%)</td>
+                <td><span style="color: #22c55e; font-weight: bold;">{r['Estado']}</span></td>
+                <td>{r['p-hat (ML)']}</td>
+                <td>${r['Stop Loss ($)']:,.2f}</td>
+                <td>${r['Take Profit ($)']:,.2f}</td>
+                <td><strong>{r['Nominales']}</strong> u.</td>
+                <td><strong>${r['Allocation ($)']:,.2f}</strong></td>
+            </tr>
+            """
+    else:
+        filas_aprobados_html = "<tr><td colspan='8' style='text-align:center;'>No se registran posiciones de compra activas en la fecha.</td></tr>"
+
+    # Construcción de filas de tabla rechazados
+    filas_rechazados_html = ""
+    for _, r in df_rechazados.iterrows():
+        razon = "Filtro ML p-hat bajo umbral" if "META-FILTER" in r['Estado'] else ("Mercado en régimen bajista" if "MACRO" in r['Estado'] else "Sin quiebre técnico activo")
+        filas_rechazados_html += f"""
+        <tr>
+            <td><strong>{r['Ticker']}</strong></td>
+            <td>${r['Precio']:,.2f}</td>
+            <td><span style="color: #eab308;">{r['Estado']}</span></td>
+            <td>{r['p-hat (ML)']}</td>
+            <td>{razon}</td>
+        </tr>
+        """
+
+    html_content = f"""
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+        <meta charset="UTF-8">
+        <title>Quant Scanner Pro — Executive Factsheet</title>
+        <style>
+            body {{
+                font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+                background-color: #ffffff;
+                color: #18181b;
+                margin: 0;
+                padding: 40px;
+                line-height: 1.6;
+            }}
+            .header {{
+                border-bottom: 3px solid #d4af37;
+                padding-bottom: 20px;
+                margin-bottom: 30px;
+            }}
+            .header h1 {{
+                margin: 0;
+                color: #09090b;
+                font-size: 26px;
+                letter-spacing: -0.5px;
+            }}
+            .header p {{
+                margin: 5px 0 0 0;
+                color: #71717a;
+                font-size: 13px;
+                text-transform: uppercase;
+                letter-spacing: 1px;
+            }}
+            .meta-bar {{
+                background-color: #f4f4f5;
+                padding: 15px;
+                border-radius: 6px;
+                margin-bottom: 30px;
+                display: flex;
+                justify-content: space-between;
+                font-size: 13px;
+            }}
+            .index-box {{
+                background-color: #fafafa;
+                border: 1px solid #e4e4e7;
+                border-left: 4px solid #d4af37;
+                padding: 20px;
+                margin-bottom: 35px;
+                border-radius: 4px;
+            }}
+            .index-box h3 {{
+                margin-top: 0;
+                color: #09090b;
+                font-size: 16px;
+            }}
+            .section-title {{
+                color: #09090b;
+                border-bottom: 1px solid #e4e4e7;
+                padding-bottom: 8px;
+                margin-top: 35px;
+                margin-bottom: 15px;
+                font-size: 18px;
+            }}
+            table {{
+                width: 100%;
+                border-collapse: collapse;
+                margin-bottom: 25px;
+                font-size: 12px;
+            }}
+            th, td {{
+                border: 1px solid #e4e4e7;
+                padding: 10px 12px;
+                text-align: left;
+            }}
+            th {{
+                background-color: #18181b;
+                color: #f4f4f5;
+                font-weight: 600;
+            }}
+            tr:nth-child(even) {{
+                background-color: #fcfcfc;
+            }}
+            .footer {{
+                margin-top: 50px;
+                border-top: 1px solid #e4e4e7;
+                padding-top: 20px;
+                font-size: 11px;
+                color: #a1a1aa;
+                text-align: center;
+            }}
+            .badge-green {{
+                background-color: #dcfce7;
+                color: #166534;
+                padding: 3px 8px;
+                border-radius: 4px;
+                font-weight: bold;
+            }}
+            @media print {{
+                body {{ padding: 0; }}
+                .no-print {{ display: none; }}
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="header">
+            <h1>QUANT SCANNER PRO — FACTSHEET EJECUTIVO</h1>
+            <p>Informe Estratégico de Asignación Cuantitativa & Auditoría de Riesgo de Cartera</p>
+        </div>
+
+        <div class="meta-bar">
+            <div><strong>Fecha de Emisión:</strong> {fecha_actual}</div>
+            <div><strong>Capital Total AUM:</strong> ${capital_total:,.2f} USD</div>
+            <div><strong>Asignado en Largo:</strong> ${capital_asignado:,.2f} USD</div>
+            <div><strong>Régimen Macro (SPY):</strong> {'BULLISH 🟢' if regimen_data['alcista'] else 'BEARISH 🔴'}</div>
+        </div>
+
+        <div class="index-box">
+            <h3>📑 ÍNDICE Y FUNDAMENTOS DEL MODELO CUANTITATIVO</h3>
+            <ol>
+                <li><strong>Fundamento Algorítmico (Donchian Volatility Breakout):</strong> Se utilizan canales de ruptura de 20 días de máximo y 10 días de mínimo para capturar tendencias de alta inercia institucional.</li>
+                <li><strong>Triple Barrier Method (Marcos López de Prado):** En lugar de medir retornos a plazos fijos, cada operación se audita mediante barreras horizontales de Stop Loss (-1.2 ATR) y Take Profit (+1.8 ATR) a 5 días de horizonte.</li>
+                <li><strong>Filtro Secundario con Machine Learning (Random Forest Meta-Labeling):</strong> Un modelo de Inteligencia Artificial evalúa variables de microestructura (RSI, Volatilidad 20d, Ratio de Volumen) para estimar la probabilidad real <code>p-hat</code> de éxito y desestimar falsos quiebres (whipsaws).</li>
+                <li><strong>Gestión Monetaria (Half-Kelly Dinámico):</strong> El tamaño de la posición se modula dinámicamente según el grado de certidumbre del modelo para prevenir la ruina del capital y maximizar la tasa de crecimiento logarítmico.</li>
+            </ol>
+        </div>
+
+        <div class="section-title">1. Resumen Ejecutivo de Oportunidades Aprobadas</div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Ticker</th>
+                    <th>Precio (Var 1D)</th>
+                    <th>Estado</th>
+                    <th>Confianza ML (p-hat)</th>
+                    <th>Stop Loss</th>
+                    <th>Take Profit</th>
+                    <th>Nominales</th>
+                    <th>Capital Asignado</th>
+                </tr>
+            </thead>
+            <tbody>
+                {filas_aprobados_html}
+            </tbody>
+        </table>
+
+        <div class="section-title">2. Activos Evaluados y Razón de Descarte Táctico</div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Ticker</th>
+                    <th>Precio Cierre</th>
+                    <th>Estado Algorítmico</th>
+                    <th>p-hat (ML)</th>
+                    <th>Justificación del Descarte / Neutralidad</th>
+                </tr>
+            </thead>
+            <tbody>
+                {filas_rechazados_html}
+            </tbody>
+        </table>
+
+        <div class="section-title">3. Tesis Táctica y Recomendación Institucional</div>
+        <p>
+            Bajo las condiciones actuales de liquidez y volatilidad, el portafolio mantiene una exposición activa del <strong>{(capital_asignado/capital_total)*100:.1f}%</strong> del AUM total, conservando un <strong>{(liquidez_restante/capital_total)*100:.1f}%</strong> en liquidez/Treasuries libres de riesgo. Se recomienda la ejecución estricta de las órdenes con los niveles de Stop Loss indicados para preservar la asimetría positiva del perfil de riesgo.
+        </p>
+
+        <div class="footer">
+            <p>QUANT SCANNER PRO — DOCUMENTO CONFIDENCIAL GENERADO PARA COMITÉ DE INVERSIÓN Y GESTIÓN PRIVADA</p>
+            <p>Para guardar este informe en PDF, presione Ctrl + P (o Cmd + P en Mac) y seleccione 'Guardar como PDF'.</p>
+        </div>
+    </body>
+    </html>
+    """
+    return html_content
 
 # ------------------------------------------------------------------------------
 # NAVEGACIÓN EN PESTAÑAS (TABS)
 # ------------------------------------------------------------------------------
-tab_scanner, tab_fundamentales, tab_macro, tab_rentafija, tab_risk = st.tabs([
+tab_scanner, tab_reporte, tab_fundamentales, tab_macro, tab_rentafija, tab_risk = st.tabs([
     "⚡ ESCÁNER CUANTITATIVO PRO",
+    "📄 INFORME EJECUTIVO (FACTSHEET)",
     "🏛️ ANÁLISIS FUNDAMENTAL & RIESGO",
     "🛢️ MACRO & COMMODITIES",
     "🏦 RENTA FIJA & INFLACIÓN EE.UU.",
@@ -285,23 +504,33 @@ tab_scanner, tab_fundamentales, tab_macro, tab_rentafija, tab_risk = st.tabs([
 ])
 
 # ==============================================================================
-# TAB 1: ESCÁNER CUANTITATIVO PRO (MOTOR PRINCIPAL)
+# TAB 1: ESCÁNER CUANTITATIVO PRO
 # ==============================================================================
 with tab_scanner:
     st.markdown("<h3 class='gold-accent'>MOTOR DE GENERACIÓN DE ALFA & META-LABELING ML</h3>", unsafe_allow_html=True)
     
-    tickers_input = st.text_area(
-        "Watchlist de Activos Monitoreados (26 activos predeterminados):",
-        value="SPY, QQQ, NVDA, AAPL, MSFT, AMZN, TSLA, META, BTC-USD, MELI, OKLO, QCOM, AVGO, YPF, TGS, MU, NU, ASML, IREN, VIST, VT, PAMP, IBIT, TSM, SPCX, BRK-B",
-        height=85
+    st.markdown("##### 🎯 Selección de Activos a Escanear")
+    modo_escaneo = st.radio(
+        "Modo de Análisis:",
+        ["Watchlist completa (26 activos predeterminados)", "Selección personalizada (Elegir activos)"],
+        horizontal=True
     )
+
+    if modo_escaneo == "Watchlist completa (26 activos predeterminados)":
+        tickers_a_procesar = ALL_TICKERS_DEFAULT
+    else:
+        tickers_a_procesar = st.multiselect(
+            "Seleccioná los activos a evaluar:",
+            ALL_TICKERS_DEFAULT,
+            default=["SPY", "NVDA", "YPF", "BTC-USD", "AAPL", "MSFT"]
+        )
 
     regimen_info = obtener_regimen_mercado()
     if activar_filtro_regimen:
         if regimen_info['alcista']:
-            st.success(f"🌐 **Macro Regime Status (BULLISH):** {regimen_info['msg']}. Filtro despejado para aperturas en largo.")
+            st.success(f"🌐 **Régimen Macro (BULLISH):** {regimen_info['msg']}. Mercado apto para posiciones de compra.")
         else:
-            st.warning(f"⚠️ **Macro Regime Status (BEARISH):** {regimen_info['msg']}. Compras bloqueadas preventivamente.")
+            st.warning(f"⚠️ **Régimen Macro (BEARISH):** {regimen_info['msg']}. Compras bloqueadas preventivamente.")
 
     def procesar_activo(ticker, capital_val, riesgo_base_val, threshold_val, regime_ok, kelly_enabled):
         try:
@@ -397,7 +626,6 @@ with tab_scanner:
             precio_sl = precio_cierre - distancia_sl_pts
             precio_tp = precio_cierre + (atr_actual * pt_mult)
 
-            # Cambio diario del activo
             retorno_diario = float((precio_cierre - float(df_clean['Close'].iloc[-2])) / float(df_clean['Close'].iloc[-2])) * 100 if len(df_clean) > 1 else 0.0
 
             b_payoff = pt_mult / sl_mult
@@ -461,176 +689,176 @@ with tab_scanner:
             fig.add_trace(go.Scatter(x=[last_date], y=[precio_sl], mode='markers+text', name='Stop Loss', marker=dict(color='#ef4444', size=10, symbol='triangle-down'), text=[f"SL: ${precio_sl:,.2f}"], textposition="bottom center"))
 
         fig.update_layout(
-            title=f"Technical Breakout & Donchian Volatility Channels — {ticker}",
+            title=f"Evolución Técnica y Canales de Donchian — {ticker}",
             xaxis_title="Fecha", yaxis_title="Precio ($ USD)", template="plotly_dark",
             paper_bgcolor="#08080a", plot_bgcolor="#0d0d11",
             height=400, margin=dict(l=30, r=30, t=40, b=30)
         )
         return fig
 
-    if st.button("🚀 EXECUTE QUANT SCANNER ENGINE", type="primary", use_container_width=True):
-        lista_tickers = [t.strip().upper() for t in tickers_input.split(",") if t.strip()]
-
-        if not lista_tickers:
-            st.error("Ingresá al menos un ticker válido.")
+    if st.button("🚀 EJECUTAR ANÁLISIS DE MERCADO", type="primary", use_container_width=True):
+        if not tickers_a_procesar:
+            st.error("Seleccioná al menos un activo válido.")
         else:
             progress_bar = st.progress(0)
             status_text = st.empty()
             resultados = []
-
             regime_ok = regimen_info['alcista']
 
-            for i, tk in enumerate(lista_tickers):
-                status_text.text(f"Evaluando {tk} ({i+1}/{len(lista_tickers)})...")
+            for i, tk in enumerate(tickers_a_procesar):
+                status_text.text(f"Analizando {tk} ({i+1}/{len(tickers_a_procesar)})...")
                 res = procesar_activo(tk, capital, riesgo_base_pct, prob_threshold, regime_ok, usar_kelly_dinamico)
                 if res:
                     resultados.append(res)
-                progress_bar.progress((i + 1) / len(lista_tickers))
+                progress_bar.progress((i + 1) / len(tickers_a_procesar))
 
             status_text.empty()
             progress_bar.empty()
 
             if resultados:
                 st.session_state['scan_results'] = resultados
-                df_res = pd.DataFrame(resultados).sort_values(by=["_prioridad", "Var 1D %"], ascending=[True, False])
-                df_activas = df_res[df_res['_prioridad'] == 1]
 
-                col1, col2, col3 = st.columns(3)
-                col1.metric("Activos Evaluados", len(lista_tickers))
-                col2.metric("Oportunidades Alpha (p-hat > TH)", len(df_activas))
-                col3.metric("Capital Allocated Total", f"${df_activas['Allocation ($)'].sum():,.2f} USD")
+    if st.session_state['scan_results'] is not None:
+        resultados = st.session_state['scan_results']
+        df_res = pd.DataFrame(resultados).sort_values(by=["_prioridad", "Var 1D %"], ascending=[True, False])
+        df_activas = df_res[df_res['_prioridad'] == 1]
 
-                st.markdown("---")
-                st.markdown("##### 🎯 Long Alpha Opportunities Approved")
-                if not df_activas.empty:
-                    st.dataframe(
-                        df_activas[['Ticker', 'Precio', 'Var 1D %', 'Estado', 'p-hat (ML)', 'Half-Kelly', 'Risk Budget', 'Stop Loss ($)', 'Take Profit ($)', 'Nominales', 'Allocation ($)']],
-                        use_container_width=True
-                    )
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Activos Evaluados", len(resultados))
+        col2.metric("Oportunidades Alpha (p-hat > TH)", len(df_activas))
+        col3.metric("Capital Asignado Total", f"${df_activas['Allocation ($)'].sum():,.2f} USD")
+
+        st.markdown("---")
+        st.markdown("##### 🎯 Señales Activas de Compra / Mantener")
+        if not df_activas.empty:
+            st.dataframe(
+                df_activas[['Ticker', 'Precio', 'Var 1D %', 'Estado', 'p-hat (ML)', 'Half-Kelly', 'Risk Budget', 'Stop Loss ($)', 'Take Profit ($)', 'Nominales', 'Allocation ($)']],
+                use_container_width=True
+            )
+        else:
+            st.info("Sin oportunidades activas de compra bajo los filtros actuales.")
+
+        st.markdown("---")
+        st.markdown("##### 📊 Inspección Técnica Individual (Seleccionar Activo)")
+        
+        opciones_tickers = [r['Ticker'] for r in resultados]
+        ticker_seleccionado = st.selectbox("🔍 Seleccionar activo para graficar:", opciones_tickers)
+        
+        res_sel = next((r for r in resultados if r['Ticker'] == ticker_seleccionado), None)
+        if res_sel:
+            c_i1, c_i2, c_i3, c_i4 = st.columns(4)
+            c_i1.markdown(f"**Estado:** {res_sel['Estado']}")
+            c_i2.markdown(f"**Probabilidad p-hat:** {res_sel['p-hat (ML)']}")
+            c_i3.markdown(f"**Risk Budget:** {res_sel['Risk Budget']}")
+            c_i4.markdown(f"**Precio Cierre:** ${res_sel['Precio']:,.2f} (`{res_sel['Var 1D %']}%`)")
+
+            fig_plotly = crear_grafico_donchian(res_sel['Ticker'], res_sel['_df'], res_sel['Stop Loss ($)'], res_sel['Take Profit ($)'], res_sel['Estado'])
+            st.plotly_chart(fig_plotly, use_container_width=True)
+
+        st.markdown("---")
+        st.markdown("##### 📋 Tabla General de Resultados de Mercado")
+        st.dataframe(df_res[['Ticker', 'Precio', 'Var 1D %', 'Estado', 'p-hat (ML)', 'Half-Kelly', 'Risk Budget', 'Stop Loss ($)', 'Take Profit ($)']], use_container_width=True)
+
+        # NOTICIAS EN TIEMPO REAL
+        st.markdown("---")
+        st.markdown("##### 📰 NOTICIAS EN TIEMPO REAL & PRICING POWER (TOP MOVERS)")
+
+        top_movers = df_res.sort_values(by="Var 1D %", ascending=False).head(4)
+        cols_noticias = st.columns(len(top_movers))
+        
+        for idx, (_, row) in enumerate(top_movers.iterrows()):
+            tk_news = row['Ticker']
+            news_list = obtener_noticias_ticker(tk_news)
+            
+            with cols_noticias[idx]:
+                st.markdown(f"**{tk_news}** (`{row['Var 1D %']}%`)")
+                if news_list:
+                    for item in news_list[:2]:
+                        title = item.get("title", "Noticia sin título")
+                        link = item.get("link", "#")
+                        publisher = item.get("publisher", "Market News")
+                        st.markdown(f"""
+                        <div class="news-card">
+                            <a href="{link}" target="_blank" style="color:#d4af37; text-decoration:none; font-weight:600; font-size:0.82rem;">{title[:75]}...</a>
+                            <p style="color:#a1a1aa; font-size:0.7rem; margin-top:4px;">Fuente: {publisher}</p>
+                        </div>
+                        """, unsafe_allow_html=True)
                 else:
-                    st.info("Sin señales de compra activas que superen los filtros institucionales hoy.")
-
-                st.markdown("---")
-                st.markdown("##### 📊 Inspección Técnica Individual")
-                
-                opciones_tickers = [r['Ticker'] for r in resultados]
-                ticker_seleccionado = st.selectbox("🔍 Seleccionar activo:", opciones_tickers)
-                
-                res_sel = next((r for r in resultados if r['Ticker'] == ticker_seleccionado), None)
-                if res_sel:
-                    c_i1, c_i2, c_i3, c_i4 = st.columns(4)
-                    c_i1.markdown(f"**Estado:** {res_sel['Estado']}")
-                    c_i2.markdown(f"**Probabilidad p-hat:** {res_sel['p-hat (ML)']}")
-                    c_i3.markdown(f"**Risk Budget:** {res_sel['Risk Budget']}")
-                    c_i4.markdown(f"**Precio Cierre:** ${res_sel['Precio']:,.2f} (`{res_sel['Var 1D %']}%`)")
-
-                    fig_plotly = crear_grafico_donchian(res_sel['Ticker'], res_sel['_df'], res_sel['Stop Loss ($)'], res_sel['Take Profit ($)'], res_sel['Estado'])
-                    st.plotly_chart(fig_plotly, use_container_width=True)
-
-                st.markdown("---")
-                st.markdown("##### 📋 Master Asset Table")
-                st.dataframe(df_res[['Ticker', 'Precio', 'Var 1D %', 'Estado', 'p-hat (ML)', 'Half-Kelly', 'Risk Budget', 'Stop Loss ($)', 'Take Profit ($)']], use_container_width=True)
-
-                # --------------------------------------------------------------
-                # SECCIÓN DE NOTICIAS EN TIEMPO REAL & PRICING POWER
-                # --------------------------------------------------------------
-                st.markdown("---")
-                st.markdown("##### 📰 NOTICIAS EN TIEMPO REAL & CATALIZADORES DE PRICING POWER")
-                st.caption("Noticias destacadas ordenadas por los principales ganadores del día y oportunidades activas")
-
-                top_movers = df_res.sort_values(by="Var 1D %", ascending=False).head(5)
-                
-                cols_noticias = st.columns(len(top_movers))
-                for idx, (_, row) in enumerate(top_movers.iterrows()):
-                    tk_news = row['Ticker']
-                    news_list = obtener_noticias_ticker(tk_news)
-                    
-                    with cols_noticias[idx]:
-                        st.markdown(f"**{tk_news}** (`{row['Var 1D %']}%`)")
-                        if news_list:
-                            for item in news_list[:2]:
-                                title = item.get("title", "Noticia sin título")
-                                link = item.get("link", "#")
-                                publisher = item.get("publisher", "Market News")
-                                st.markdown(f"""
-                                <div class="news-card">
-                                    <a href="{link}" target="_blank" style="color:#d4af37; text-decoration:none; font-weight:600; font-size:0.82rem;">{title[:75]}...</a>
-                                    <p style="color:#a1a1aa; font-size:0.7rem; margin-top:4px;">Fuente: {publisher}</p>
-                                </div>
-                                """, unsafe_allow_html=True)
-                        else:
-                            st.caption("Sin noticias recientes.")
-
-                # Generador de Factsheet Descargable
-                st.markdown("---")
-                st.markdown("##### 📄 Executive Institutional Factsheet")
-                
-                csv_data = df_res[['Ticker', 'Precio', 'Var 1D %', 'Estado', 'p-hat (ML)', 'Half-Kelly', 'Risk Budget', 'Stop Loss ($)', 'Take Profit ($)']].to_csv(index=False)
-                st.download_button(
-                    label="📥 DOWNLOAD INSTITUTIONAL TEAR-SHEET (CSV)",
-                    data=csv_data,
-                    file_name=f"quant_factsheet_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
-                    mime="text/csv"
-                )
-
-                if telegram_token and telegram_chat_id:
-                    fecha_str = datetime.now().strftime("%Y-%m-%d %H:%M")
-                    msg = f"⚡ *INFORME QUANT SCANNER PRO*\n📅 `{fecha_str}`\n"
-                    msg += f"🌐 Macro Régimen: `{'BULLISH 🟢' if regime_ok else 'BEARISH 🔴'}`\n\n"
-                    
-                    if not df_activas.empty:
-                        for _, r in df_activas.iterrows():
-                            msg += f"🟢 *{r['Ticker']}* — {r['Estado']}\n• Precio: `${r['Precio']:,.2f}` | p-hat: `{r['p-hat (ML)']}` | Risk: `{r['Risk Budget']}`\n• SL: `${r['Stop Loss ($)']:,.2f}` | TP: `${r['Take Profit ($)']:,.2f}`\n• Nominales: `{r['Nominales']}` (~`${r['Allocation ($)']:,.2f} USD`)\n\n"
-                    else:
-                        msg += "⚪ Sin oportunidades activas bajo los filtros actuales."
-
-                    url = f"https://api.telegram.org/bot{telegram_token}/sendMessage"
-                    try:
-                        requests.post(url, json={"chat_id": telegram_chat_id, "text": msg, "parse_mode": "Markdown"}, timeout=5)
-                        st.success("📱 Alerta enviada a Telegram.")
-                    except Exception as e:
-                        st.warning(f"Error Telegram: {e}")
+                    st.caption("Sin noticias recientes.")
 
 # ==============================================================================
-# TAB 2: ANÁLISIS FUNDAMENTAL & RIESGO PRIVADO (NUEVA PESTAÑA)
+# TAB 2: INFORME EJECUTIVO (FACTSHEET PDF/HTML)
+# ==============================================================================
+with tab_reporte:
+    st.markdown("<h3 class='gold-accent'>INFORME EJECUTIVO & FACTSHEET INSTITUCIONAL</h3>", unsafe_allow_html=True)
+    st.caption("Generación de Documentos de Inversión Formateados para Comités de Riesgo y Clientes Privados")
+
+    if st.session_state['scan_results'] is None:
+        st.info("👈 Por favor ejecutá primero el escáner en la pestaña '⚡ ESCÁNER CUANTITATIVO PRO' para consolidar los datos del informe.")
+    else:
+        st.success("✅ Informe consolidado listo para lectura y exportación.")
+        
+        regime_data = obtener_regimen_mercado()
+        html_doc = generar_informe_html_ejecutivo(st.session_state['scan_results'], capital, regime_data)
+
+        st.markdown("##### 📄 Previsualización del Documento Ejecutivo")
+        components.html(html_doc, height=650, scrolling=True)
+
+        st.markdown("---")
+        st.markdown("##### 📥 Opciones de Descarga e Impresión")
+        
+        col_d1, col_d2 = st.columns(2)
+        with col_d1:
+            st.download_button(
+                label="📄 DESCARGAR FACTSHEET (DOCUMENTO HTML)",
+                data=html_doc,
+                file_name=f"Quant_Executive_Report_{datetime.now().strftime('%Y%m%d')}.html",
+                mime="text/html",
+                use_container_width=True
+            )
+        with col_d2:
+            st.info("💡 **Para Guardar como PDF:** Abrí el documento HTML descargado y presioná `Ctrl + P` (o `Cmd + P` en Mac) para elegir 'Guardar como PDF'.")
+
+# ==============================================================================
+# TAB 3: ANÁLISIS FUNDAMENTAL & RIESGO
 # ==============================================================================
 with tab_fundamentales:
-    st.markdown("<h3 class='gold-accent'>ANÁLISIS FUNDAMENTAL & MARCO DE RIESGO INSTITUCIONAL</h3>", unsafe_allow_html=True)
-    st.caption("Checklist de Análisis Fundamental para la Evaluación de Pricing Power, Cobertura de Deuda y Moat Corporativo")
+    st.markdown("<h3 class='gold-accent'>ANÁLISIS FUNDAMENTAL & MARCO DE RIESGO</h3>", unsafe_allow_html=True)
+    st.caption("Evaluación de Pricing Power, Cobertura de Deuda y Salud Financiera Corporativa")
 
     st.markdown("""
-    #### 🏛️ Los 4 Pilares de Auditoría de un CIO / Analista de Riesgo Privado:
-    1. **Pricing Power & Gross Margin Moat:** Evalúa la capacidad de la empresa para trasladar la inflación a los precios finales sin perder volumen de venta (Margen Bruto > 40%).
-    2. **Debt Service Coverage & Solventing:** Controla la relación Deuda/Patrimonio (Debt to Equity < 1.5) para evitar crisis de liquidez en entornos de tasas de interés elevadas.
-    3. **Free Cash Flow Yield & Profitability:** Mide la conversión limpia de beneficios contables en efectivo libre disponible para distribución o reinversión.
-    4. **Sensibilidad Macro & Sustitutividad:** Resistencia del activo ante variaciones en el Dólar (DXY), Petróleo y Tasas del Tesoro a 10 años.
+    #### 🏛️ Los 4 Pilares de Auditoría:
+    1. **Pricing Power & Margen Bruto:** Capacidad de la empresa para trasladar la inflación a precios sin perder volumen (Margen Bruto > 40%).
+    2. **Cobertura de Deuda & Solvencia:** Relación Deuda/Patrimonio (Debt to Equity < 1.5) para evitar riesgos en entornos de tasas altas.
+    3. **Free Cash Flow Yield:** Conversión de beneficios contables en flujo de caja libre real para reinversión.
+    4. **Sensibilidad Macro:** Resistencia ante cambios en el Dólar (DXY), Petróleo y Tasa 10Y.
     """)
 
     st.markdown("---")
-    st.markdown("##### 📋 Matriz de Indicadores Fundamentales de la Watchlist")
+    st.markdown("##### 📋 Matriz de Indicadores Fundamentales")
 
-    tickers_fund = ["SPY", "QQQ", "NVDA", "AAPL", "MSFT", "AMZN", "TSLA", "META", "MELI", "OKLO", "QCOM", "AVGO", "YPF", "TGS", "MU", "NU", "ASML", "IREN", "VIST", "PAMP", "TSM", "BRK-B"]
-    
-    if st.button("📊 Cargar Datos Fundamentales de la Watchlist", type="secondary"):
+    if st.button("📊 Cargar/Actualizar Datos Fundamentales de la Watchlist", type="primary"):
         fund_list = []
         progress_f = st.progress(0)
-        for idx, tk_f in enumerate(tickers_fund):
+        for idx, tk_f in enumerate(ALL_TICKERS_DEFAULT[:15]):
             res_f = obtener_fundamentales_ticker(tk_f)
             if res_f:
                 fund_list.append(res_f)
-            progress_f.progress((idx + 1) / len(tickers_fund))
+            progress_f.progress((idx + 1) / 15)
         progress_f.empty()
 
         if fund_list:
-            df_fund = pd.DataFrame(fund_list)
-            st.dataframe(df_fund, use_container_width=True)
+            st.session_state['fund_table'] = pd.DataFrame(fund_list)
+
+    if 'fund_table' in st.session_state:
+        st.dataframe(st.session_state['fund_table'], use_container_width=True)
 
     st.markdown("---")
-    st.markdown("##### 🔍 Profiler Fundamental e Inspección de Pricing Power por Activo")
+    st.markdown("##### 🔍 Profiler Fundamental e Inspección por Activo")
     
-    tk_selected = st.selectbox("Elegí un activo para auditar sus métricas fundamentales y noticias corporativas:", tickers_fund)
-    
+    tk_selected = st.selectbox("Elegí un activo para auditar sus métricas fundamentales:", ALL_TICKERS_DEFAULT)
     fund_single = obtener_fundamentales_ticker(tk_selected)
+    
     if fund_single:
         c1, c2, c3, c4 = st.columns(4)
         c1.metric("Pricing Power Index", fund_single["Pricing Power Index"])
@@ -642,24 +870,22 @@ with tab_fundamentales:
         c5.metric("Sector", fund_single["Sector"])
         c6.metric("Market Cap ($B)", f"${fund_single['Market Cap ($B)']} B")
         c7.metric("Profit Margin (%)", fund_single["Profit Margin (%)"])
-        c8.metric("Debt / Equity Ratio", fund_single["Debt / Equity"])
+        c8.metric("Debt / Equity", fund_single["Debt / Equity"])
 
     st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown(f"##### 📰 Noticias Corporativas & Catalizadores Fundamentales — {tk_selected}")
+    st.markdown(f"##### 📰 Noticias Corporativas & Catalizadores — {tk_selected}")
     single_news = obtener_noticias_ticker(tk_selected)
     if single_news:
         for item in single_news:
             st.markdown(f"""
             <div class="news-card">
-                <a href="{item.get('link', '#')}" target="_blank" style="color:#d4af37; text-decoration:none; font-weight:600; font-size:0.9rem;">{item.get('title', 'Noticia sin título')}</a>
-                <p style="color:#a1a1aa; font-size:0.75rem; margin-top:4px;">Fuente: {item.get('publisher', 'Financial News')} | Publicado recientemente</p>
+                <a href="{item.get('link', '#')}" target="_blank" style="color:#d4af37; text-decoration:none; font-weight:600; font-size:0.88rem;">{item.get('title', 'Noticia sin título')}</a>
+                <p style="color:#a1a1aa; font-size:0.72rem; margin-top:4px;">Fuente: {item.get('publisher', 'Financial News')}</p>
             </div>
             """, unsafe_allow_html=True)
-    else:
-        st.info("Sin noticias fundamentales recientes registradas para este activo.")
 
 # ==============================================================================
-# TAB 3: MACRO & COMMODITIES
+# TAB 4: MACRO & COMMODITIES
 # ==============================================================================
 with tab_macro:
     st.markdown("<h3 class='gold-accent'>MONITOREO MACROECONÓMICO & SECTOR ENERGÍA</h3>", unsafe_allow_html=True)
@@ -728,7 +954,7 @@ with tab_macro:
         st.plotly_chart(fig_macro, use_container_width=True)
 
 # ==============================================================================
-# TAB 4: RENTA FIJA & INFLACIÓN EE.UU.
+# TAB 5: RENTA FIJA & INFLACIÓN EE.UU.
 # ==============================================================================
 with tab_rentafija:
     st.markdown("<h3 class='gold-accent'>CALCULADORA DE RENTA FIJA & RENTABILIDAD REAL</h3>", unsafe_allow_html=True)
@@ -800,104 +1026,111 @@ with tab_rentafija:
     st.plotly_chart(fig_rf, use_container_width=True)
 
 # ==============================================================================
-# TAB 5: RIESGO DE CARTERA & MONTE CARLO
+# TAB 6: RIESGO DE CARTERA & MONTE CARLO
 # ==============================================================================
 with tab_risk:
     st.markdown("<h3 class='gold-accent'>MOTOR DE RIESGO INSTITUCIONAL & SIMULACIÓN MONTE CARLO</h3>", unsafe_allow_html=True)
-    st.caption("Métricas Avanzadas de Riesgo de Cola (VaR / CVaR), Deflated Sharpe Ratio (DSR), Monte Carlo Simulation & Matriz de Correlación")
+    st.caption("Métricas Avanzadas de Riesgo de Cola (VaR / CVaR 99%), Deflated Sharpe Ratio (DSR) & Simulación Estocástica")
+
+    @st.cache_data(ttl=3600)
+    def obtener_retornos_base_cartera():
+        tickers_base = ["SPY", "QQQ", "NVDA", "AAPL", "MSFT", "YPF", "VT"]
+        try:
+            df = yf.download(tickers_base, period="1y", interval="1d", progress=False)['Close']
+            return df.pct_change().dropna()
+        except Exception:
+            return pd.DataFrame()
 
     scan_res = st.session_state.get('scan_results', [])
 
-    if not scan_res:
-        st.info("👈 Por favor ejecutá primero el escáner en la pestaña '⚡ ESCÁNER CUANTITATIVO PRO' para calcular las métricas de riesgo del portafolio.")
-    else:
+    if scan_res:
         returns_dict = {r['Ticker']: r['_returns'] for r in scan_res if r['_returns'] is not None and len(r['_returns']) > 50}
         df_returns = pd.DataFrame(returns_dict).dropna()
+        origen_str = "Señales del Escáner Cuantitativo"
+    else:
+        df_returns = obtener_retornos_base_cartera()
+        origen_str = "Cartera Benchmark Base (SPY, QQQ, NVDA, AAPL, MSFT, YPF, VT)"
 
-        if not df_returns.empty:
-            port_returns = df_returns.mean(axis=1)
+    if not df_returns.empty:
+        st.info(f"📊 Evaluando métricas de riesgo sobre: **{origen_str}**")
+        port_returns = df_returns.mean(axis=1)
 
-            mean_ret = port_returns.mean()
-            std_ret = port_returns.std()
-            
-            sharpe_ann = (mean_ret / std_ret) * np.sqrt(252) if std_ret > 0 else 0
-            neg_ret = port_returns[port_returns < 0]
-            downside_std = neg_ret.std()
-            sortino_ann = (mean_ret / downside_std) * np.sqrt(252) if downside_std > 0 else 0
+        mean_ret = port_returns.mean()
+        std_ret = port_returns.std()
+        
+        sharpe_ann = (mean_ret / std_ret) * np.sqrt(252) if std_ret > 0 else 0
+        neg_ret = port_returns[port_returns < 0]
+        downside_std = neg_ret.std()
+        sortino_ann = (mean_ret / downside_std) * np.sqrt(252) if downside_std > 0 else 0
 
-            var_99_pct = abs(np.percentile(port_returns, 1))
-            var_99_usd = var_99_pct * capital
+        var_99_pct = abs(np.percentile(port_returns, 1))
+        var_99_usd = var_99_pct * capital
 
-            tail_losses = port_returns[port_returns <= -var_99_pct]
-            cvar_99_pct = abs(tail_losses.mean()) if len(tail_losses) > 0 else var_99_pct
-            cvar_99_usd = cvar_99_pct * capital
+        tail_losses = port_returns[port_returns <= -var_99_pct]
+        cvar_99_pct = abs(tail_losses.mean()) if len(tail_losses) > 0 else var_99_pct
+        cvar_99_usd = cvar_99_pct * capital
 
-            skew_val = port_returns.skew()
-            kurt_val = port_returns.kurtosis()
-            N_obs = len(port_returns)
-            
-            dsr_std = np.sqrt((1 - skew_val * sharpe_ann + ((kurt_val - 1) / 4) * (sharpe_ann ** 2)) / (N_obs - 1)) if N_obs > 1 else 1.0
-            dsr_prob = max(0.01, min(0.99, 1.0 - (0.5 * (1.0 + math.erf(-sharpe_ann / (dsr_std * np.sqrt(2)))))))
+        skew_val = port_returns.skew()
+        kurt_val = port_returns.kurtosis()
+        N_obs = len(port_returns)
+        
+        dsr_std = np.sqrt((1 - skew_val * sharpe_ann + ((kurt_val - 1) / 4) * (sharpe_ann ** 2)) / (N_obs - 1)) if N_obs > 1 else 1.0
+        dsr_prob = max(0.01, min(0.99, 1.0 - (0.5 * (1.0 + math.erf(-sharpe_ann / (dsr_std * np.sqrt(2)))))))
 
-            st.markdown("##### 🛡️ Métricas Diarias de Riesgo Extremo & Performance")
-            m_col1, m_col2, m_col3, m_col4 = st.columns(4)
-            m_col1.metric("Daily VaR 99% ($ USD)", f"${var_99_usd:,.2f}", f"-{var_99_pct*100:.2f}%")
-            m_col2.metric("Expected Shortfall CVaR 99%", f"${cvar_99_usd:,.2f}", f"-{cvar_99_pct*100:.2f}%")
-            m_col3.metric("Annualized Sharpe Ratio", f"{sharpe_ann:.2f}")
-            m_col4.metric("Deflated Sharpe (DSR Prob)", f"{dsr_prob*100:.1f}%", help="Probabilidad de que el Sharpe no sea fruto de overfitting.")
+        st.markdown("##### 🛡️ Métricas Diarias de Riesgo Extremo & Performance")
+        m_col1, m_col2, m_col3, m_col4 = st.columns(4)
+        m_col1.metric("Daily VaR 99% ($ USD)", f"${var_99_usd:,.2f}", f"-{var_99_pct*100:.2f}%")
+        m_col2.metric("Expected Shortfall CVaR 99%", f"${cvar_99_usd:,.2f}", f"-{cvar_99_pct*100:.2f}%")
+        m_col3.metric("Annualized Sharpe Ratio", f"{sharpe_ann:.2f}")
+        m_col4.metric("Deflated Sharpe (DSR Prob)", f"{dsr_prob*100:.1f}%", help="Probabilidad de que el Sharpe no sea fruto de overfitting.")
 
-            st.markdown("---")
+        st.markdown("---")
+        st.markdown("##### 🎲 Simulación de Monte Carlo (1,000 Caminos a 1 Año - 252 Días)")
 
-            st.markdown("##### 🎲 Simulación de Monte Carlo (1,000 Caminos a 1 Año - 252 Días)")
+        n_sims = 1000
+        n_days = 252
+        
+        sim_paths = np.zeros((n_days, n_sims))
+        sim_paths[0] = capital
 
-            n_sims = 1000
-            n_days = 252
-            
-            sim_paths = np.zeros((n_days, n_sims))
-            sim_paths[0] = capital
+        for t in range(1, n_days):
+            random_returns = np.random.choice(port_returns, size=n_sims, replace=True)
+            sim_paths[t] = sim_paths[t-1] * (1 + random_returns)
 
-            for t in range(1, n_days):
-                random_returns = np.random.choice(port_returns, size=n_sims, replace=True)
-                sim_paths[t] = sim_paths[t-1] * (1 + random_returns)
+        percentile_5 = np.percentile(sim_paths, 5, axis=1)
+        percentile_50 = np.percentile(sim_paths, 50, axis=1)
+        percentile_95 = np.percentile(sim_paths, 95, axis=1)
 
-            percentile_5 = np.percentile(sim_paths, 5, axis=1)
-            percentile_50 = np.percentile(sim_paths, 50, axis=1)
-            percentile_95 = np.percentile(sim_paths, 95, axis=1)
+        fig_mc = go.Figure()
+        for s in range(30):
+            fig_mc.add_trace(go.Scatter(y=sim_paths[:, s], mode='lines', line=dict(color='rgba(212, 175, 55, 0.08)', width=1), showlegend=False))
 
-            fig_mc = go.Figure()
-            
-            for s in range(30):
-                fig_mc.add_trace(go.Scatter(y=sim_paths[:, s], mode='lines', line=dict(color='rgba(212, 175, 55, 0.08)', width=1), showlegend=False))
+        fig_mc.add_trace(go.Scatter(y=percentile_95, mode='lines', name='P95 (Escenario Optimista)', line=dict(color='#22c55e', width=2)))
+        fig_mc.add_trace(go.Scatter(y=percentile_50, mode='lines', name='Mediana P50 (Esperado)', line=dict(color='#d4af37', width=2.5)))
+        fig_mc.add_trace(go.Scatter(y=percentile_5, mode='lines', name='P5 (Escenario Adverso)', line=dict(color='#ef4444', width=2)))
 
-            fig_mc.add_trace(go.Scatter(y=percentile_95, mode='lines', name='P95 (Escenario Optimista)', line=dict(color='#22c55e', width=2)))
-            fig_mc.add_trace(go.Scatter(y=percentile_50, mode='lines', name='Mediana P50 (Esperado)', line=dict(color='#d4af37', width=2.5)))
-            fig_mc.add_trace(go.Scatter(y=percentile_5, mode='lines', name='P5 (Escenario Adverso)', line=dict(color='#ef4444', width=2)))
+        fig_mc.update_layout(
+            title="Distribución Estocástica de Capital (Monte Carlo 1,000 Caminos)",
+            xaxis_title="Días de Trading (1 Año)", yaxis_title="Capital ($ USD)",
+            template="plotly_dark", paper_bgcolor="#08080a", plot_bgcolor="#0d0d11",
+            height=400, margin=dict(l=20, r=20, t=40, b=20)
+        )
+        st.plotly_chart(fig_mc, use_container_width=True)
 
-            fig_mc.update_layout(
-                title="Distribución Estocástica de Capital Portfolio Monte Carlo",
-                xaxis_title="Días de Trading (1 Año)", yaxis_title="Capital ($ USD)",
-                template="plotly_dark", paper_bgcolor="#08080a", plot_bgcolor="#0d0d11",
-                height=400, margin=dict(l=20, r=20, t=40, b=20)
-            )
-            st.plotly_chart(fig_mc, use_container_width=True)
+        st.markdown("---")
+        st.markdown("##### 🗺️ Matriz de Correlación Cruzada de Activos")
 
-            st.markdown("---")
-
-            st.markdown("##### 🗺️ Matriz de Correlación Cruzada de Activos")
-
-            corr_matrix = df_returns.corr()
-            
-            fig_corr = px.imshow(
-                corr_matrix,
-                text_auto=".2f",
-                color_continuous_scale=[[0, "#08080a"], [0.5, "#3f3f46"], [1, "#d4af37"]],
-                aspect="auto",
-                title="Correlaciones Cruzadas de la Watchlist"
-            )
-            fig_corr.update_layout(
-                template="plotly_dark", paper_bgcolor="#08080a", plot_bgcolor="#0d0d11",
-                height=500, margin=dict(l=20, r=20, t=40, b=20)
-            )
-            st.plotly_chart(fig_corr, use_container_width=True)
+        corr_matrix = df_returns.corr()
+        fig_corr = px.imshow(
+            corr_matrix, text_auto=".2f",
+            color_continuous_scale=[[0, "#08080a"], [0.5, "#3f3f46"], [1, "#d4af37"]],
+            aspect="auto", title="Correlaciones Cruzadas de la Cartera"
+        )
+        fig_corr.update_layout(
+            template="plotly_dark", paper_bgcolor="#08080a", plot_bgcolor="#0d0d11",
+            height=500, margin=dict(l=20, r=20, t=40, b=20)
+        )
+        st.plotly_chart(fig_corr, use_container_width=True)
+    else:
+        st.warning("No fue posible cargar datos de retornos para la simulación de riesgo.")
     
-   
