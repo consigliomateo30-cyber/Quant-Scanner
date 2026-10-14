@@ -1,6 +1,6 @@
 # ==============================================================================
-# MASTER FINANCIAL TERMINAL & QUANT SCANNER PRO (v3.0)
-# Dark Neón Dashboard: Macro Commodities + Fixed Income Calculator + Quant Scanner
+# BLOOMBERG STYLE QUANT TERMINAL — BLACK & GOLD MINIMALIST v3.5
+# Dark Gold UI | Macro Energy | Fixed Income & Real Inflation | Quant ML Scanner
 # ==============================================================================
 
 import streamlit as st
@@ -10,94 +10,177 @@ import numpy as np
 import math
 import requests
 import plotly.graph_objects as go
-import plotly.express as px
 from sklearn.ensemble import RandomForestClassifier
 from datetime import datetime
 
 # ------------------------------------------------------------------------------
-# CONFIGURACIÓN DE LA PÁGINA Y ESTILO TERMINAL NEÓN
+# CONFIGURACIÓN DE PÁGINA Y ESTILOS CSS CUSTOM (BLACK & GOLD MINIMALIST)
 # ------------------------------------------------------------------------------
 st.set_page_config(
-    page_title="Master Financial Terminal Pro",
-    page_icon="💎",
+    page_title="Bloomberg Quant Terminal | Black & Gold",
+    page_icon="⚜️",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Estilo Neón Dark Mode Avanzado (Bloomberg / TradingView Style)
+# Inyección de CSS Minimalista Negro & Dorado Lujo
 st.markdown("""
 <style>
-    .stApp { background-color: #080c14; color: #f1f5f9; font-family: 'Inter', sans-serif; }
-    
-    /* Headers */
-    h1, h2, h3 { color: #f8fafc !important; font-weight: 700; letter-spacing: -0.5px; }
-    
-    /* Custom Cards */
-    .terminal-card {
-        background: linear-gradient(135deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.9) 100%);
-        border: 1px solid rgba(56, 189, 248, 0.25);
-        border-radius: 12px;
-        padding: 18px;
-        margin-bottom: 12px;
-        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    /* Fondo principal obsidiana */
+    .stApp {
+        background-color: #08080a !important;
+        color: #e4e4e7 !important;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     }
     
-    /* Metric Highlights */
-    [data-testid="stMetricValue"] { font-size: 1.7rem !important; font-weight: 700 !important; color: #38bdf8 !important; }
-    [data-testid="stMetricLabel"] { font-size: 0.85rem !important; color: #94a3b8 !important; }
+    /* Headers en blanco metálico y dorado */
+    h1, h2, h3, h4 {
+        color: #f4f4f5 !important;
+        font-weight: 600 !important;
+        letter-spacing: -0.5px !important;
+    }
     
-    /* Tabs Header */
-    .stTabs [data-baseweb="tab-list"] { gap: 10px; }
-    .stTabs [data-baseweb="tab"] {
-        background-color: #1e293b;
-        border-radius: 8px;
-        color: #94a3b8;
-        padding: 10px 20px;
+    /* Subtítulos en acento dorado tenue */
+    .gold-accent {
+        color: #d4af37 !important;
         font-weight: 600;
     }
+    
+    /* Tarjetas y Contenedores */
+    div[data-testid="stMetric"], .stMetric {
+        background: #111115 !important;
+        border: 1px solid rgba(212, 175, 55, 0.22) !important;
+        border-radius: 6px !important;
+        padding: 12px 16px !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5) !important;
+    }
+    
+    [data-testid="stMetricValue"] {
+        color: #d4af37 !important;
+        font-weight: 700 !important;
+        font-size: 1.6rem !important;
+        font-family: 'SF Mono', 'Roboto Mono', monospace !important;
+    }
+    
+    [data-testid="stMetricLabel"] {
+        color: #a1a1aa !important;
+        font-size: 0.8rem !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.8px !important;
+    }
+    
+    /* Pestañas (Tabs) estilo Bloomberg Terminal */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 6px;
+        background-color: #0c0c0f;
+        padding: 6px;
+        border-radius: 8px;
+        border: 1px solid #1f1f24;
+    }
+    
+    .stTabs [data-baseweb="tab"] {
+        background-color: transparent;
+        border-radius: 4px;
+        color: #8e8e93;
+        padding: 8px 18px;
+        font-weight: 500;
+        font-size: 0.88rem;
+        border: none !important;
+    }
+    
     .stTabs [aria-selected="true"] {
-        background-color: #0284c7 !important;
-        color: #ffffff !important;
+        background-color: #1a1813 !important;
+        color: #d4af37 !important;
+        border: 1px solid #d4af37 !important;
+        font-weight: 600 !important;
+    }
+    
+    /* Botones Dorados */
+    .stButton > button {
+        background: linear-gradient(180deg, #1f1a0e 0%, #12100a 100%) !important;
+        color: #d4af37 !important;
+        border: 1px solid #d4af37 !important;
+        border-radius: 6px !important;
+        font-weight: 600 !important;
+        letter-spacing: 0.5px !important;
+        transition: all 0.2s ease-in-out !important;
+    }
+    
+    .stButton > button:hover {
+        background: #d4af37 !important;
+        color: #000000 !important;
+        box-shadow: 0 0 12px rgba(212, 175, 55, 0.4) !important;
+    }
+    
+    /* Sidebar */
+    section[data-testid="stSidebar"] {
+        background-color: #0b0b0e !important;
+        border-right: 1px solid #1a1a20 !important;
+    }
+    
+    /* Inputs y Textareas */
+    .stTextInput input, .stNumberInput input, .stTextArea textarea, .stSelectbox div[data-baseweb="select"] {
+        background-color: #111116 !important;
+        color: #f4f4f5 !important;
+        border: 1px solid #27272a !important;
+        border-radius: 4px !important;
+    }
+    
+    .stTextInput input:focus, .stTextArea textarea:focus {
+        border-color: #d4af37 !important;
+        box-shadow: 0 0 6px rgba(212, 175, 55, 0.3) !important;
     }
 </style>
 """, unsafe_allow_html=True)
 
 # ------------------------------------------------------------------------------
-# PANEL LATERAL (SIDEBAR DE CONFIGURACIÓN)
+# PANEL LATERAL CONFIGURACIÓN (SIDEBAR)
 # ------------------------------------------------------------------------------
-st.sidebar.title("🎛️ Configuración Terminal")
+st.sidebar.markdown("### ⚜️ TERMINAL CONTROL")
+st.sidebar.caption("Parámetros Cuantitativos de Gestión")
+
 capital = st.sidebar.number_input("Capital Total ($ USD)", value=100000.0, step=5000.0)
 riesgo_base_pct = st.sidebar.slider("Riesgo Base por Trade (%)", min_value=0.25, max_value=3.0, value=1.0, step=0.25)
-prob_threshold = st.sidebar.slider("Umbral de Seguridad ML", min_value=0.40, max_value=0.70, value=0.50, step=0.01)
+prob_threshold = st.sidebar.slider("Umbral Confianza ML", min_value=0.40, max_value=0.70, value=0.50, step=0.01)
 
 st.sidebar.markdown("---")
-st.sidebar.subheader("🛡️ Filtros Cuantitativos")
-activar_filtro_regimen = st.sidebar.checkbox("Filtro Régimen Macro (SPY > SMA200)", value=True)
+st.sidebar.markdown("##### 🛡️ Filtros de Cobertura")
+activar_filtro_regimen = st.sidebar.checkbox("Filtro Macro (SPY > SMA200)", value=True)
 usar_kelly_dinamico = st.sidebar.checkbox("Kelly Fraccionado Dinámico", value=True)
 
 st.sidebar.markdown("---")
-st.sidebar.subheader("📱 Alertas Telegram")
+st.sidebar.markdown("##### 📱 Telegram Alerts")
 telegram_token = st.sidebar.text_input("Bot Token", type="password")
 telegram_chat_id = st.sidebar.text_input("Chat ID")
 
 # ------------------------------------------------------------------------------
-# FUNCIONES AUXILIARES DE DATOS MACRO
+# CABECERA TERMINAL
+# ------------------------------------------------------------------------------
+col_h1, col_h2 = st.columns([3, 1])
+with col_h1:
+    st.markdown("<h1 style='margin-bottom:0px;'>BLOOMBERG QUANT TERMINAL</h1>", unsafe_allow_html=True)
+    st.markdown("<p style='color:#a1a1aa; font-size:0.9rem;'>SISTEMA DE ANÁLISIS MACRO, RENTA FIJA Y ESCÁNER CUANTITATIVO MULTIACTIVO</p>", unsafe_allow_html=True)
+with col_h2:
+    st.markdown(f"<div style='text-align:right; color:#d4af37; font-family:monospace; margin-top:15px;'>{datetime.now().strftime('%Y-%m-%d | %H:%M UTC')}</div>", unsafe_allow_html=True)
+
+st.markdown("---")
+
+# ------------------------------------------------------------------------------
+# DATOS MACRO Y RÉGIMEN CACHEADOS
 # ------------------------------------------------------------------------------
 @st.cache_data(ttl=1800)
 def obtener_datos_macro():
     tickers = {
         "WTI Oil": "CL=F",
         "Brent Oil": "BZ=F",
-        "Natural Gas": "NG=F",
-        "Energy Sector": "XLE",
-        "Oil Services": "OIH",
-        "US 10Y Yield": "^TNX",
-        "VIX Volatility": "^VIX",
-        "DXY Dollar Index": "DX-Y.NYB",
-        "Gold Futures": "GC=F",
-        "TIPS Inflation ETF": "TIP"
+        "Nat Gas": "NG=F",
+        "Sector Energía": "XLE",
+        "Servicios Petroleros": "OIH",
+        "Bono 10Y EE.UU.": "^TNX",
+        "VIX Volatilidad": "^VIX",
+        "Dólar DXY": "DX-Y.NYB",
+        "Oro": "GC=F"
     }
-    
     datos = {}
     for nombre, symbol in tickers.items():
         try:
@@ -125,7 +208,7 @@ def obtener_regimen_mercado():
     try:
         spy = yf.download("SPY", period="2y", interval="1d", progress=False)
         if spy.empty or len(spy) < 200:
-            return {"alcista": True, "precio": 0, "sma200": 0, "msg": "Sin datos SPY"}
+            return {"alcista": True, "precio": 0, "sma200": 0, "msg": "Datos SPY insuficientes"}
         
         if isinstance(spy.columns, pd.MultiIndex):
             spy = spy.xs("SPY", axis=1, level=1) if "SPY" in spy.columns.levels[1] else spy.droplevel(1, axis=1)
@@ -142,130 +225,124 @@ def obtener_regimen_mercado():
             "msg": f"SPY ${precio_spy:.2f} vs SMA200${sma200_spy:.2f}"
         }
     except Exception as e:
-        return {"alcista": True, "precio": 0, "sma200": 0, "msg": f"Error SPY: {e}"}
+        return {"alcista": True, "precio": 0, "sma200": 0, "msg": f"Error: {e}"}
 
 # ------------------------------------------------------------------------------
-# INTERFAZ DE VENTANAS PRINCIPALES (ST.TABS)
+# NAVEGACIÓN EN PESTAÑAS (TABS)
 # ------------------------------------------------------------------------------
-st.title("💎 Master Financial Terminal Pro")
-st.caption("Terminal Multiactivo: Macro & Energía | Calculadora de Renta Fija | Quant Scanner Machine Learning")
-
 tab_macro, tab_rentafija, tab_scanner = st.tabs([
-    "🛢️ Macro Terminal & Energía",
-    "🏦 Calculadora Renta Fija & Inflación EE.UU.",
-    "⚡ Quant Scanner Pro (26 Activos)"
+    "🛢️ TERMINAL MACRO & ENERGÍA",
+    "🏦 RENTA FIJA & INFLACIÓN EE.UU.",
+    "⚡ QUANT SCANNER PRO"
 ])
 
 # ==============================================================================
-# VENTANA 1: MACRO TERMINAL & COMMODITIES (PETRÓLEO Y ENERGÍA)
+# TAB 1: MACRO TERMINAL & COMMODITIES (BLACK & GOLD)
 # ==============================================================================
 with tab_macro:
-    st.subheader("🌐 Dashboard Macro & Commodities de Energía")
+    st.markdown("<h3 class='gold-accent'>MONITOREO MACROECONÓMICO & ENERGÍA EN TIEMPO REAL</h3>", unsafe_allow_html=True)
     
     datos_macro = obtener_datos_macro()
     
     if datos_macro:
-        # Fila 1: Commodities de Energía
-        st.markdown("##### 🛢️ Petróleo y Gas Natural")
+        st.markdown("##### 🛢️ Commodities de Energía & Petróleo")
         c1, c2, c3, c4 = st.columns(4)
         
         if "WTI Oil" in datos_macro:
             d = datos_macro["WTI Oil"]
-            c1.metric("WTI Crude Oil", f"${d['precio']} USD", f"{d['var_pct']}%")
+            c1.metric("WTI Crude", f"${d['precio']} USD", f"{d['var_pct']}%")
         if "Brent Oil" in datos_macro:
             d = datos_macro["Brent Oil"]
-            c2.metric("Brent Crude Oil", f"${d['precio']} USD", f"{d['var_pct']}%")
-        if "Natural Gas" in datos_macro:
-            d = datos_macro["Natural Gas"]
+            c2.metric("Brent Crude", f"${d['precio']} USD", f"{d['var_pct']}%")
+        if "Nat Gas" in datos_macro:
+            d = datos_macro["Nat Gas"]
             c3.metric("Natural Gas", f"${d['precio']} USD", f"{d['var_pct']}%")
-        if "Energy Sector" in datos_macro:
-            d = datos_macro["Energy Sector"]
-            c4.metric("Sector Energía (XLE)", f"${d['precio']} USD", f"{d['var_pct']}%")
+        if "Sector Energía" in datos_macro:
+            d = datos_macro["Sector Energía"]
+            c4.metric("Sector XLE", f"${d['precio']} USD", f"{d['var_pct']}%")
 
-        # Fila 2: Riesgo Macro Global
-        st.markdown("##### 📊 Indicadores Macro de Riesgo Global")
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown("##### 📊 Indicadores Globales de Riesgo y Liquidez")
         m1, m2, m3, m4 = st.columns(4)
         
-        if "US 10Y Yield" in datos_macro:
-            d = datos_macro["US 10Y Yield"]
-            m1.metric("Bono 10Y EE.UU.", f"{d['precio']}%", f"{d['var_pct']}%")
-        if "VIX Volatility" in datos_macro:
-            d = datos_macro["VIX Volatility"]
-            m2.metric("VIX Volatilidad", f"{d['precio']}", f"{d['var_pct']}%")
-        if "DXY Dollar Index" in datos_macro:
-            d = datos_macro["DXY Dollar Index"]
-            m3.metric("Dólar DXY", f"{d['precio']}", f"{d['var_pct']}%")
-        if "Gold Futures" in datos_macro:
-            d = datos_macro["Gold Futures"]
-            m4.metric("Oro (Gold)", f"${d['precio']} USD", f"{d['var_pct']}%")
+        if "Bono 10Y EE.UU." in datos_macro:
+            d = datos_macro["Bono 10Y EE.UU."]
+            m1.metric("US 10Y Yield", f"{d['precio']}%", f"{d['var_pct']}%")
+        if "VIX Volatilidad" in datos_macro:
+            d = datos_macro["VIX Volatilidad"]
+            m2.metric("VIX Index", f"{d['precio']}", f"{d['var_pct']}%")
+        if "Dólar DXY" in datos_macro:
+            d = datos_macro["Dólar DXY"]
+            m3.metric("DXY Index", f"{d['precio']}", f"{d['var_pct']}%")
+        if "Oro" in datos_macro:
+            d = datos_macro["Oro"]
+            m4.metric("Gold Futures", f"${d['precio']} USD", f"{d['var_pct']}%")
 
         st.markdown("---")
-        st.markdown("##### 📈 Rendimiento Histórico Acumulado (1 Año - Normalizado %)")
+        st.markdown("##### 📈 Curva Comparativa Acumulada (1 Año - Normalizada %)")
         
-        # Gráfico comparativo de commodities
         fig_macro = go.Figure()
-        for k in ["WTI Oil", "Natural Gas", "Energy Sector"]:
+        colores_gold = {"WTI Oil": "#d4af37", "Nat Gas": "#e2e8f0", "Sector Energía": "#a38340"}
+        
+        for k in ["WTI Oil", "Nat Gas", "Sector Energía"]:
             if k in datos_macro:
                 df_c = datos_macro[k]["df"]
                 norm_series = ((df_c['Close'] / df_c['Close'].iloc[0]) - 1) * 100
-                fig_macro.add_trace(go.Scatter(x=df_c.index, y=norm_series, mode='lines', name=k))
+                fig_macro.add_trace(go.Scatter(
+                    x=df_c.index, y=norm_series, mode='lines', name=k,
+                    line=dict(color=colores_gold.get(k, '#d4af37'), width=2)
+                ))
 
         fig_macro.update_layout(
             template="plotly_dark",
-            height=420,
-            xaxis_title="Fecha",
-            yaxis_title="Variación Acumulada (%)",
+            paper_bgcolor="#08080a",
+            plot_bgcolor="#0d0d11",
+            height=400,
+            xaxis=dict(showgrid=True, gridcolor="#1a1a22"),
+            yaxis=dict(showgrid=True, gridcolor="#1a1a22", title="Variación %"),
             margin=dict(l=20, r=20, t=30, b=20),
-            legend=dict(orientation="h", y=1.1)
+            legend=dict(orientation="h", y=1.08, xanchor="right", x=1)
         )
         st.plotly_chart(fig_macro, use_container_width=True)
-    else:
-        st.info("Cargando indicadores macroeconómicos en tiempo real...")
 
 # ==============================================================================
-# VENTANA 2: CALCULADORA DE RENTA FIJA & INFLACIÓN EE.UU. EN TIEMPO REAL
+# TAB 2: RENTA FIJA & INFLACIÓN EE.UU.
 # ==============================================================================
 with tab_rentafija:
-    st.subheader("🏦 Calculadora de Renta Fija y Comparación de Rendimiento Real")
-    st.caption("Ajuste por Inflación de EE.UU. mediante Fórmula de Fisher: Tasa Real = (1 + TNA) / (1 + Inflación) - 1")
+    st.markdown("<h3 class='gold-accent'>CALCULADORA DE RENTA FIJA & RASA REAL DE INFLACIÓN</h3>", unsafe_allow_html=True)
+    st.caption("Ajuste por Inflación de EE.UU. con Fórmula de Fisher: Tasa Real = (1 + TNA) / (1 + Inflación) - 1")
 
-    # Benchmark estimado de inflación EE.UU. (CPI YoY actual) y 10Y Yield
-    c1, c2, c3 = st.columns(3)
-    
-    tnx_val = datos_macro.get("US 10Y Yield", {}).get("precio", 4.10) if datos_macro else 4.10
+    tnx_val = datos_macro.get("Bono 10Y EE.UU.", {}).get("precio", 4.10) if datos_macro else 4.10
     inflacion_us_est = 2.80  # Referencia Inflación Anual EE.UU. (CPI YoY)
     tasa_real_benchmark = ((1 + (tnx_val / 100)) / (1 + (inflacion_us_est / 100)) - 1) * 100
 
-    c1.metric("Bono Tesoro EE.UU. 10Y (Nominal)", f"{tnx_val:.2f}% TNA")
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Bono 10Y EE.UU. (Nominal)", f"{tnx_val:.2f}% TNA")
     c2.metric("Inflación EE.UU. (CPI YoY Est.)", f"{inflacion_us_est:.2f}% Anual")
-    c3.metric("Tasa Real Neta Tesoro EE.UU.", f"{tasa_real_benchmark:.2f}% Real", help="Rendimiento del Bono 10Y por encima de la inflación")
+    c3.metric("Tasa Real Neta Benchmark", f"{tasa_real_benchmark:.2f}% Real")
 
     st.markdown("---")
-    st.markdown("### 🧮 Simulador de Instrumentos de Renta Fija (Bonos, T-Bills, Corporativos)")
+    st.markdown("##### 🧮 Simulación de Bonos y T-Bills")
 
-    col_input1, col_input2 = st.columns(2)
+    col_i1, col_i2 = st.columns(2)
+    with col_i1:
+        monto_inv = st.number_input("Capital Invertido ($ USD):", value=10000.0, step=1000.0)
+        tna_propia = st.number_input("Tasa Nominal Anual (TNA %):", value=5.25, step=0.25)
+        plazo_anos = st.slider("Plazo de Madurez (Años):", min_value=0.5, max_value=30.0, value=3.0, step=0.5)
 
-    with col_input1:
-        monto_inv = st.number_input("Capital a Invertir ($ USD):", value=10000.0, step=1000.0)
-        tna_propia = st.number_input("Tasa Nominal Anual del Instrumento (TNA %):", value=5.25, step=0.25)
-        plazo_anos = st.slider("Plazo / Madurez (Años):", min_value=0.5, max_value=30.0, value=3.0, step=0.5)
-
-    with col_input2:
+    with col_i2:
         frecuencia_cupon = st.selectbox(
-            "Frecuencia de Pago de Cupones:",
+            "Frecuencia de Cupones:",
             ["Al Vencimiento (Cero Cupón / T-Bill)", "Semestral (2 pagos/año)", "Anual (1 pago/año)", "Trimestral (4 pagos/año)"]
         )
-        inflacion_user = st.number_input("Proyección de Inflación Anual EE.UU. (%):", value=inflacion_us_est, step=0.1)
+        inflacion_user = st.number_input("Inflación Proyectada EE.UU. (%):", value=inflacion_us_est, step=0.1)
 
-    # Cálculo Matemático Financiero
     pagos_por_ano = 1 if "Anual" in frecuencia_cupon else (2 if "Semestral" in frecuencia_cupon else (4 if "Trimestral" in frecuencia_cupon else 0))
-    
     if pagos_por_ano > 0:
         n_periodos = int(plazo_anos * pagos_por_ano)
         tasa_periodo = (tna_propia / 100) / pagos_por_ano
         monto_final_nominal = monto_inv * ((1 + tasa_periodo) ** n_periodos)
     else:
-        # Cero Cupón / Capitalización Simple
         monto_final_nominal = monto_inv * (1 + (tna_propia / 100) * plazo_anos)
 
     ganancia_nominal_usd = monto_final_nominal - monto_inv
@@ -273,52 +350,52 @@ with tab_rentafija:
     monto_final_real = monto_inv * ((1 + (tasa_real_anual / 100)) ** plazo_anos)
     ganancia_real_usd = monto_final_real - monto_inv
 
-    st.markdown("---")
-    st.markdown("### 📊 Métricas de Rendimiento Nominal vs Real")
-    
+    st.markdown("<br>", unsafe_allow_html=True)
     r1, r2, r3, r4 = st.columns(4)
-    r1.metric("Monto Final Nominal", f"${monto_final_nominal:,.2f} USD", f"+${ganancia_nominal_usd:,.2f}")
-    r2.metric("Monto Final Real (Poder Compra)", f"${monto_final_real:,.2f} USD", f"+${ganancia_real_usd:,.2f}")
-    r3.metric("Tasa Nominal Anual (TNA)", f"{tna_propia:.2f}%")
-    r4.metric("Tasa Real Neta Ajustada", f"{tasa_real_anual:.2f}% Anual")
+    r1.metric("Capital Nominal Final", f"${monto_final_nominal:,.2f} USD", f"+${ganancia_nominal_usd:,.2f}")
+    r2.metric("Capital Real (Poder Compra)", f"${monto_final_real:,.2f} USD", f"+${ganancia_real_usd:,.2f}")
+    r3.metric("Tasa Nominal Anual", f"{tna_propia:.2f}%")
+    r4.metric("Tasa Real Neta Fisher", f"{tasa_real_anual:.2f}%")
 
-    # Gráfico de proyección de Capital
+    # Gráfico de Proyección
     anos_eje = np.linspace(0, plazo_anos, 50)
     curva_nominal = monto_inv * ((1 + (tna_propia / 100)) ** anos_eje)
     curva_real = monto_inv * ((1 + (tasa_real_anual / 100)) ** anos_eje)
 
     fig_rf = go.Figure()
-    fig_rf.add_trace(go.Scatter(x=anos_eje, y=curva_nominal, mode='lines', name='Capital Nominal ($ USD)', line=dict(color='#38bdf8', width=2.5)))
-    fig_rf.add_trace(go.Scatter(x=anos_eje, y=curva_real, mode='lines', name='Capital Real (Ajustado por Inflación)', line=dict(color='#22c55e', width=2.5, dash='dash')))
+    fig_rf.add_trace(go.Scatter(x=anos_eje, y=curva_nominal, mode='lines', name='Curva Nominal ($ USD)', line=dict(color='#d4af37', width=2.5)))
+    fig_rf.add_trace(go.Scatter(x=anos_eje, y=curva_real, mode='lines', name='Curva Real (Ajustada Inflación)', line=dict(color='#e2e8f0', width=2, dash='dash')))
 
     fig_rf.update_layout(
-        title="Proyección de Crecimiento de Capital: Nominal vs Ajustado por Inflación",
+        title="Proyección Temporal de Retorno Nominal vs Real",
         xaxis_title="Tiempo (Años)",
         yaxis_title="Monto ($ USD)",
         template="plotly_dark",
+        paper_bgcolor="#08080a",
+        plot_bgcolor="#0d0d11",
         height=380,
         margin=dict(l=20, r=20, t=40, b=20)
     )
     st.plotly_chart(fig_rf, use_container_width=True)
 
 # ==============================================================================
-# VENTANA 3: QUANT SCANNER PRO (26 ACTIVOS + ML + HALF-KELLY)
+# TAB 3: QUANT SCANNER PRO (26 ACTIVOS + ML + HALF-KELLY)
 # ==============================================================================
 with tab_scanner:
-    st.subheader("⚡ Escáner Cuantitativo Multiactivo Pro")
+    st.markdown("<h3 class='gold-accent'>ESCÁNER CUANTITATIVO Y SEÑALES DE MACHINE LEARNING</h3>", unsafe_allow_html=True)
     
     tickers_input = st.text_area(
-        "Watchlist de Activos Monitoreados (separados por coma):",
+        "Watchlist de Activos Monitoreados (26 activos predeterminados):",
         value="SPY, QQQ, NVDA, AAPL, MSFT, AMZN, TSLA, META, BTC-USD, MELI, OKLO, QCOM, AVGO, YPF, TGS, MU, NU, ASML, IREN, VIST, VT, PAMP, IBIT, TSM, SPCX, BRK-B",
-        height=90
+        height=85
     )
 
     regimen_info = obtener_regimen_mercado()
     if activar_filtro_regimen:
         if regimen_info['alcista']:
-            st.success(f"🌐 **Régimen Macro (BULLISH):** {regimen_info['msg']}. Mercado apto para entradas.")
+            st.success(f"🌐 **Régimen Macro Favorables (BULLISH):** {regimen_info['msg']}. Mercado apto para posiciones de Breakout.")
         else:
-            st.warning(f"⚠️ **Régimen Macro (BEARISH):** {regimen_info['msg']}. Entradas en largo bloqueadas automáticamente.")
+            st.warning(f"⚠️ **Régimen Macro Cauteloso (BEARISH):** {regimen_info['msg']}. Compras bloqueadas para proteger capital.")
 
     def procesar_activo(ticker, capital_val, riesgo_base_val, threshold_val, regime_ok, kelly_enabled):
         try:
@@ -464,22 +541,27 @@ with tab_scanner:
     def crear_grafico_donchian(ticker, df_hist, precio_sl, precio_tp, estado):
         fig = go.Figure()
 
-        fig.add_trace(go.Scatter(x=df_hist.index, y=df_hist['Close'], mode='lines', name='Precio Cierre', line=dict(color='#38bdf8', width=2)))
-        fig.add_trace(go.Scatter(x=df_hist.index, y=df_hist['Donchian_High'], mode='lines', name='Donchian High (20d)', line=dict(color='#22c55e', width=1.5, dash='dash')))
+        # Precio
+        fig.add_trace(go.Scatter(x=df_hist.index, y=df_hist['Close'], mode='lines', name='Precio Cierre', line=dict(color='#e4e4e7', width=2)))
+        # Donchian High (Dorado)
+        fig.add_trace(go.Scatter(x=df_hist.index, y=df_hist['Donchian_High'], mode='lines', name='Donchian High (20d)', line=dict(color='#d4af37', width=1.5, dash='dash')))
+        # Donchian Low (Gris)
         fig.add_trace(go.Scatter(x=df_hist.index, y=df_hist['Donchian_Low'], mode='lines', name='Donchian Low (10d)', line=dict(color='#ef4444', width=1.5, dash='dash')))
 
         if "COMPRA" in estado or "MANTENER" in estado:
             last_date = df_hist.index[-1]
-            fig.add_trace(go.Scatter(x=[last_date], y=[precio_tp], mode='markers+text', name='Take Profit', marker=dict(color='#22c55e', size=10, symbol='triangle-up'), text=[f"TP: ${precio_tp:,.2f}"], textposition="top center"))
+            fig.add_trace(go.Scatter(x=[last_date], y=[precio_tp], mode='markers+text', name='Take Profit', marker=dict(color='#d4af37', size=10, symbol='triangle-up'), text=[f"TP: ${precio_tp:,.2f}"], textposition="top center"))
             fig.add_trace(go.Scatter(x=[last_date], y=[precio_sl], mode='markers+text', name='Stop Loss', marker=dict(color='#ef4444', size=10, symbol='triangle-down'), text=[f"SL: ${precio_sl:,.2f}"], textposition="bottom center"))
 
         fig.update_layout(
             title=f"Evolución Técnica y Canales de Donchian — {ticker}",
-            xaxis_title="Fecha", yaxis_title="Precio ($ USD)", template="plotly_dark", height=400, margin=dict(l=30, r=30, t=40, b=30)
+            xaxis_title="Fecha", yaxis_title="Precio ($ USD)", template="plotly_dark",
+            paper_bgcolor="#08080a", plot_bgcolor="#0d0d11",
+            height=400, margin=dict(l=30, r=30, t=40, b=30)
         )
         return fig
 
-    if st.button("🚀 Ejecutar Escáner Cuantitativo Avanzado", type="primary", use_container_width=True):
+    if st.button("🚀 EJECUTAR ESCÁNER CUANTITATIVO", type="primary", use_container_width=True):
         lista_tickers = [t.strip().upper() for t in tickers_input.split(",") if t.strip()]
 
         if not lista_tickers:
@@ -507,24 +589,24 @@ with tab_scanner:
 
                 col1, col2, col3 = st.columns(3)
                 col1.metric("Activos Escaneados", len(lista_tickers))
-                col2.metric("Oportunidades Aprobadas", len(df_activas))
-                col3.metric("Capital Total Asignado", f"${df_activas['Capital ($)'].sum():,.2f} USD")
+                col2.metric("Oportunidades ML", len(df_activas))
+                col3.metric("Capital Asignado", f"${df_activas['Capital ($)'].sum():,.2f} USD")
 
                 st.markdown("---")
-                st.markdown("### 🎯 Oportunidades Activas Aprobadas")
+                st.markdown("##### 🎯 Oportunidades Activas Aprobadas")
                 if not df_activas.empty:
                     st.dataframe(
                         df_activas[['Ticker', 'Precio', 'Estado', 'Confianza ML', 'Half-Kelly %', 'Riesgo Usado', 'Stop Loss ($)', 'Take Profit ($)', 'Unidades', 'Capital ($)']],
                         use_container_width=True
                     )
                 else:
-                    st.info("No hay señales de compra que superen los filtros de Régimen Macro y ML en este momento.")
+                    st.info("Sin señales de compra activas que superen los filtros en este momento.")
 
                 st.markdown("---")
-                st.markdown("### 📊 Gráficos Interactivos")
+                st.markdown("##### 📊 Gráficos Interactivos")
                 
                 opciones_tickers = [r['Ticker'] for r in resultados]
-                ticker_seleccionado = st.selectbox("🔍 Seleccionar activo a inspeccionar:", opciones_tickers)
+                ticker_seleccionado = st.selectbox("🔍 Seleccionar activo a analizar:", opciones_tickers)
                 
                 res_sel = next((r for r in resultados if r['Ticker'] == ticker_seleccionado), None)
                 if res_sel:
@@ -538,7 +620,7 @@ with tab_scanner:
                     st.plotly_chart(fig_plotly, use_container_width=True)
 
                 st.markdown("---")
-                st.markdown("### 📋 Resultados Completos del Mercado")
+                st.markdown("##### 📋 Resultados Completos del Mercado")
                 st.dataframe(df_res[['Ticker', 'Precio', 'Estado', 'Confianza ML', 'Half-Kelly %', 'Riesgo Usado', 'Stop Loss ($)', 'Take Profit ($)']], use_container_width=True)
 
                 if telegram_token and telegram_chat_id:
