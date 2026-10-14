@@ -1,5 +1,5 @@
 # ==============================================================================
-# STREAMLIT QUANT SCANNER WEB APP
+# STREAMLIT QUANT SCANNER WEB APP CON GRÁFICOS INTERACTIVOS (PLOTLY)
 # Donchian Volatility Breakout + Triple Barrier + Meta-Labeling ML + Telegram
 # ==============================================================================
 
@@ -9,6 +9,7 @@ import pandas as pd
 import numpy as np
 import math
 import requests
+import plotly.graph_objects as go
 from sklearn.ensemble import RandomForestClassifier
 from datetime import datetime
 
@@ -45,7 +46,7 @@ telegram_chat_id = st.sidebar.text_input("Chat ID")
 # INTERFAZ PRINCIPAL
 # ------------------------------------------------------------------------------
 st.title("📈 Master Quantitative Market Scanner")
-st.caption("Donchian Volatility Breakout + Triple Barrier Method + Meta-Labeling Machine Learning")
+st.caption("Rompimiento de Volatilidad por Canales de Donchian + Método de la Triple Barrera + Meta-Etiquetado con Aprendizaje Automático")
 
 tickers_input = st.text_area(
     "Tickers a evaluar (separados por coma):",
@@ -85,7 +86,7 @@ def procesar_activo(ticker, capital_val, riesgo_val, threshold_val):
         df['Primary_Signal'] = pd.Series(sig, index=df.index).ffill().fillna(0)
         df['Primary_Entry'] = np.where((df['Primary_Signal'] == 1) & (df['Primary_Signal'].shift(1) == 0), 1, 0)
 
-        # Triple Barrier
+        # Triple Barrier Method
         labels = []
         indices = df.index
         entries = df[df['Primary_Entry'] == 1].index
@@ -176,16 +177,70 @@ def procesar_activo(ticker, capital_val, riesgo_val, threshold_val):
             "Take Profit ($)": round(precio_tp, 2) if primary_signal == 1 else 0.0,
             "Unidades": unidades if prioridad == 1 else 0,
             "Capital ($)": round(monto_total_usd, 2) if prioridad == 1 else 0.0,
+            "_df": df_clean.tail(120),  # Últimos 120 días para el gráfico
             "_prioridad": prioridad,
             "_prob_raw": ml_prob
         }
     except Exception:
         return None
 
+# Función para generar gráficos con Plotly
+def crear_grafico_donchian(ticker, df_hist, precio_sl, precio_tp, estado):
+    fig = go.Figure()
+
+    # Precio de Cierre
+    fig.add_trace(go.Scatter(
+        x=df_hist.index, y=df_hist['Close'],
+        mode='lines', name='Precio Cierre',
+        line=dict(color='#38bdf8', width=2)
+    ))
+
+    # Canal Donchian High (Entrada)
+    fig.add_trace(go.Scatter(
+        x=df_hist.index, y=df_hist['Donchian_High'],
+        mode='lines', name='Donchian High (20d)',
+        line=dict(color='#22c55e', width=1.5, dash='dash')
+    ))
+
+    # Canal Donchian Low (Salida)
+    fig.add_trace(go.Scatter(
+        x=df_hist.index, y=df_hist['Donchian_Low'],
+        mode='lines', name='Donchian Low (10d)',
+        line=dict(color='#ef4444', width=1.5, dash='dash')
+    ))
+
+    # Si hay señal activa de compra, mostramos niveles SL y TP
+    if "COMPRA" in estado or "MANTENER" in estado:
+        last_date = df_hist.index[-1]
+        fig.add_trace(go.Scatter(
+            x=[last_date], y=[precio_tp],
+            mode='markers+text', name='Take Profit',
+            marker=dict(color='#22c55e', size=10, symbol='triangle-up'),
+            text=[f"TP: ${precio_tp:,.2f}"], textposition="top center"
+        ))
+        fig.add_trace(go.Scatter(
+            x=[last_date], y=[precio_sl],
+            mode='markers+text', name='Stop Loss',
+            marker=dict(color='#ef4444', size=10, symbol='triangle-down'),
+            text=[f"SL: ${precio_sl:,.2f}"], textposition="bottom center"
+        ))
+
+    fig.update_layout(
+        title=f"Evolución Técnica y Canales de Donchian — {ticker}",
+        xaxis_title="Fecha",
+        yaxis_title="Precio ($ USD)",
+        template="plotly_dark",
+        height=400,
+        margin=dict(l=40, r=40, t=50, b=40),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+    )
+
+    return fig
+
 # Botón de ejecución
 if st.button("🚀 Ejecutar Escáner de Mercado", type="primary", use_container_width=True):
     lista_tickers = [t.strip().upper() for t in tickers_input.split(",") if t.strip()]
-    
+
     if not lista_tickers:
         st.error("Ingresá al menos un ticker válido.")
     else:
@@ -207,13 +262,14 @@ if st.button("🚀 Ejecutar Escáner de Mercado", type="primary", use_container_
             df_res = pd.DataFrame(resultados).sort_values(by=["_prioridad", "_prob_raw"], ascending=[True, False])
             df_activas = df_res[df_res['_prioridad'] == 1]
 
-            # Métricas en tarjetas
+            # Tarjetas con métricas
             col1, col2, col3 = st.columns(3)
             col1.metric("Activos Escaneados", len(lista_tickers))
             col2.metric("Oportunidades ML", len(df_activas))
             col3.metric("Capital Asignado", f"${df_activas['Capital ($)'].sum():,.2f} USD")
 
-            st.markdown("### 🎯 Oportunidades Activas")
+            st.markdown("---")
+            st.markdown("### 🎯 Oportunidades Activas Aprobadas")
             if not df_activas.empty:
                 st.dataframe(
                     df_activas[['Ticker', 'Precio', 'Estado', 'Confianza ML', 'Stop Loss ($)', 'Take Profit ($)', 'Unidades', 'Capital ($)']],
@@ -222,7 +278,27 @@ if st.button("🚀 Ejecutar Escáner de Mercado", type="primary", use_container_
             else:
                 st.info("No hay señales de compra que superen el filtro de seguridad de ML hoy.")
 
-            st.markdown("### 📋 Resultados Completo del Mercado")
+            st.markdown("---")
+            st.markdown("### 📊 Gráficos Interactivos de los Activos Evaluados")
+            
+            # Pestañas para navegar los gráficos de cada ticker
+            tabs = st.tabs([r['Ticker'] for r in resultados])
+            for tab, res in zip(tabs, resultados):
+                with tab:
+                    col_info1, col_info2, col_info3 = st.columns(3)
+                    col_info1.write(f"**Estado:** {res['Estado']}")
+                    col_info2.write(f"**Confianza ML:** {res['Confianza ML']}")
+                    col_info3.write(f"**Precio Cierre:** ${res['Precio']:,.2f}")
+
+                    fig_plotly = crear_grafico_donchian(
+                        res['Ticker'], res['_df'],
+                        res['Stop Loss ($)'], res['Take Profit ($)'],
+                        res['Estado']
+                    )
+                    st.plotly_chart(fig_plotly, use_container_width=True)
+
+            st.markdown("---")
+            st.markdown("### 📋 Resultados Completos del Mercado")
             st.dataframe(
                 df_res[['Ticker', 'Precio', 'Estado', 'Confianza ML', 'Stop Loss ($)', 'Take Profit ($)']],
                 use_container_width=True
