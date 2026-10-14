@@ -1,7 +1,7 @@
 # ==============================================================================
-# QUANT SCANNER PRO — INSTITUTIONAL TERMINAL v4.5 (BLACK & GOLD EDITION)
+# QUANT SCANNER PRO — INSTITUTIONAL TERMINAL v5.0 (BLACK & GOLD EDITION)
 # Multi-Asset Quantitative Scanner | Random Forest Meta-Labeling | Half-Kelly |
-# Macro Energy Terminal | Fixed Income Matrix | VaR/CVaR & Monte Carlo Audit
+# Real-Time Fundamental News & Pricing Power Catalysts | Fundamental Risk Matrix
 # ==============================================================================
 
 import streamlit as st
@@ -115,6 +115,16 @@ st.markdown("""
         box-shadow: 0 0 12px rgba(212, 175, 55, 0.4) !important;
     }
     
+    /* Tarjetas de Noticias */
+    .news-card {
+        background: #111116;
+        border: 1px solid #27272a;
+        border-left: 3px solid #d4af37;
+        border-radius: 6px;
+        padding: 12px;
+        margin-bottom: 10px;
+    }
+    
     /* Sidebar */
     section[data-testid="stSidebar"] {
         background-color: #0b0b0e !important;
@@ -170,7 +180,7 @@ with col_h2:
 st.markdown("---")
 
 # ------------------------------------------------------------------------------
-# DATOS CACHEADOS MACRO Y RÉGIMEN
+# DATOS CACHEADOS MACRO Y FUNDAMENTALES
 # ------------------------------------------------------------------------------
 @st.cache_data(ttl=1800)
 def obtener_datos_macro():
@@ -231,11 +241,44 @@ def obtener_regimen_mercado():
     except Exception as e:
         return {"alcista": True, "precio": 0, "sma200": 0, "msg": f"Error: {e}"}
 
+@st.cache_data(ttl=1800)
+def obtener_noticias_ticker(ticker):
+    try:
+        tk = yf.Ticker(ticker)
+        news = tk.news
+        if news and len(news) > 0:
+            return news[:3]
+    except Exception:
+        pass
+    return []
+
+@st.cache_data(ttl=3600)
+def obtener_fundamentales_ticker(ticker):
+    try:
+        info = yf.Ticker(ticker).info
+        gross_m = info.get("grossMargins", None)
+        pricing_power = "ALTO 🟢" if (gross_m or 0) >= 0.40 else ("MEDIO 🟡" if (gross_m or 0) >= 0.20 else "N/A ⚪")
+        
+        return {
+            "Ticker": ticker,
+            "Sector": info.get("sector", "N/A"),
+            "Market Cap ($B)": round(info.get("marketCap", 0) / 1e9, 2) if info.get("marketCap") else "N/A",
+            "Forward P/E": round(info.get("forwardPE", 0), 2) if info.get("forwardPE") else "N/A",
+            "Gross Margin (%)": f"{round(gross_m * 100, 1)}%" if gross_m is not None else "N/A",
+            "Profit Margin (%)": f"{round(info.get('profitMargins', 0) * 100, 1)}%" if info.get("profitMargins") is not None else "N/A",
+            "Debt / Equity": round(info.get("debtToEquity", 0), 2) if info.get("debtToEquity") else "N/A",
+            "Free Cash Flow ($B)": round(info.get("freeCashflow", 0) / 1e9, 2) if info.get("freeCashflow") else "N/A",
+            "Pricing Power Index": pricing_power
+        }
+    except Exception:
+        return None
+
 # ------------------------------------------------------------------------------
 # NAVEGACIÓN EN PESTAÑAS (TABS)
 # ------------------------------------------------------------------------------
-tab_scanner, tab_macro, tab_rentafija, tab_risk = st.tabs([
+tab_scanner, tab_fundamentales, tab_macro, tab_rentafija, tab_risk = st.tabs([
     "⚡ ESCÁNER CUANTITATIVO PRO",
+    "🏛️ ANÁLISIS FUNDAMENTAL & RIESGO",
     "🛢️ MACRO & COMMODITIES",
     "🏦 RENTA FIJA & INFLACIÓN EE.UU.",
     "🛡️ RIESGO DE CARTERA & MONTE CARLO"
@@ -354,6 +397,9 @@ with tab_scanner:
             precio_sl = precio_cierre - distancia_sl_pts
             precio_tp = precio_cierre + (atr_actual * pt_mult)
 
+            # Cambio diario del activo
+            retorno_diario = float((precio_cierre - float(df_clean['Close'].iloc[-2])) / float(df_clean['Close'].iloc[-2])) * 100 if len(df_clean) > 1 else 0.0
+
             b_payoff = pt_mult / sl_mult
             p = ml_prob
             f_kelly = (p * b_payoff - (1 - p)) / b_payoff if b_payoff > 0 else 0
@@ -386,6 +432,7 @@ with tab_scanner:
             return {
                 "Ticker": ticker.upper(),
                 "Precio": round(precio_cierre, 2),
+                "Var 1D %": round(retorno_diario, 2),
                 "Estado": estado_str,
                 "p-hat (ML)": f"{ml_prob*100:.1f}%",
                 "Half-Kelly": f"{half_kelly_frac*100:.1f}%",
@@ -445,7 +492,7 @@ with tab_scanner:
 
             if resultados:
                 st.session_state['scan_results'] = resultados
-                df_res = pd.DataFrame(resultados).sort_values(by=["_prioridad", "_prob_raw"], ascending=[True, False])
+                df_res = pd.DataFrame(resultados).sort_values(by=["_prioridad", "Var 1D %"], ascending=[True, False])
                 df_activas = df_res[df_res['_prioridad'] == 1]
 
                 col1, col2, col3 = st.columns(3)
@@ -457,7 +504,7 @@ with tab_scanner:
                 st.markdown("##### 🎯 Long Alpha Opportunities Approved")
                 if not df_activas.empty:
                     st.dataframe(
-                        df_activas[['Ticker', 'Precio', 'Estado', 'p-hat (ML)', 'Half-Kelly', 'Risk Budget', 'Stop Loss ($)', 'Take Profit ($)', 'Nominales', 'Allocation ($)']],
+                        df_activas[['Ticker', 'Precio', 'Var 1D %', 'Estado', 'p-hat (ML)', 'Half-Kelly', 'Risk Budget', 'Stop Loss ($)', 'Take Profit ($)', 'Nominales', 'Allocation ($)']],
                         use_container_width=True
                     )
                 else:
@@ -475,20 +522,50 @@ with tab_scanner:
                     c_i1.markdown(f"**Estado:** {res_sel['Estado']}")
                     c_i2.markdown(f"**Probabilidad p-hat:** {res_sel['p-hat (ML)']}")
                     c_i3.markdown(f"**Risk Budget:** {res_sel['Risk Budget']}")
-                    c_i4.markdown(f"**Precio Cierre:** ${res_sel['Precio']:,.2f}")
+                    c_i4.markdown(f"**Precio Cierre:** ${res_sel['Precio']:,.2f} (`{res_sel['Var 1D %']}%`)")
 
                     fig_plotly = crear_grafico_donchian(res_sel['Ticker'], res_sel['_df'], res_sel['Stop Loss ($)'], res_sel['Take Profit ($)'], res_sel['Estado'])
                     st.plotly_chart(fig_plotly, use_container_width=True)
 
                 st.markdown("---")
                 st.markdown("##### 📋 Master Asset Table")
-                st.dataframe(df_res[['Ticker', 'Precio', 'Estado', 'p-hat (ML)', 'Half-Kelly', 'Risk Budget', 'Stop Loss ($)', 'Take Profit ($)']], use_container_width=True)
+                st.dataframe(df_res[['Ticker', 'Precio', 'Var 1D %', 'Estado', 'p-hat (ML)', 'Half-Kelly', 'Risk Budget', 'Stop Loss ($)', 'Take Profit ($)']], use_container_width=True)
+
+                # --------------------------------------------------------------
+                # SECCIÓN DE NOTICIAS EN TIEMPO REAL & PRICING POWER
+                # --------------------------------------------------------------
+                st.markdown("---")
+                st.markdown("##### 📰 NOTICIAS EN TIEMPO REAL & CATALIZADORES DE PRICING POWER")
+                st.caption("Noticias destacadas ordenadas por los principales ganadores del día y oportunidades activas")
+
+                top_movers = df_res.sort_values(by="Var 1D %", ascending=False).head(5)
+                
+                cols_noticias = st.columns(len(top_movers))
+                for idx, (_, row) in enumerate(top_movers.iterrows()):
+                    tk_news = row['Ticker']
+                    news_list = obtener_noticias_ticker(tk_news)
+                    
+                    with cols_noticias[idx]:
+                        st.markdown(f"**{tk_news}** (`{row['Var 1D %']}%`)")
+                        if news_list:
+                            for item in news_list[:2]:
+                                title = item.get("title", "Noticia sin título")
+                                link = item.get("link", "#")
+                                publisher = item.get("publisher", "Market News")
+                                st.markdown(f"""
+                                <div class="news-card">
+                                    <a href="{link}" target="_blank" style="color:#d4af37; text-decoration:none; font-weight:600; font-size:0.82rem;">{title[:75]}...</a>
+                                    <p style="color:#a1a1aa; font-size:0.7rem; margin-top:4px;">Fuente: {publisher}</p>
+                                </div>
+                                """, unsafe_allow_html=True)
+                        else:
+                            st.caption("Sin noticias recientes.")
 
                 # Generador de Factsheet Descargable
                 st.markdown("---")
                 st.markdown("##### 📄 Executive Institutional Factsheet")
                 
-                csv_data = df_res[['Ticker', 'Precio', 'Estado', 'p-hat (ML)', 'Half-Kelly', 'Risk Budget', 'Stop Loss ($)', 'Take Profit ($)']].to_csv(index=False)
+                csv_data = df_res[['Ticker', 'Precio', 'Var 1D %', 'Estado', 'p-hat (ML)', 'Half-Kelly', 'Risk Budget', 'Stop Loss ($)', 'Take Profit ($)']].to_csv(index=False)
                 st.download_button(
                     label="📥 DOWNLOAD INSTITUTIONAL TEAR-SHEET (CSV)",
                     data=csv_data,
@@ -515,7 +592,74 @@ with tab_scanner:
                         st.warning(f"Error Telegram: {e}")
 
 # ==============================================================================
-# TAB 2: MACRO & COMMODITIES
+# TAB 2: ANÁLISIS FUNDAMENTAL & RIESGO PRIVADO (NUEVA PESTAÑA)
+# ==============================================================================
+with tab_fundamentales:
+    st.markdown("<h3 class='gold-accent'>ANÁLISIS FUNDAMENTAL & MARCO DE RIESGO INSTITUCIONAL</h3>", unsafe_allow_html=True)
+    st.caption("Checklist de Análisis Fundamental para la Evaluación de Pricing Power, Cobertura de Deuda y Moat Corporativo")
+
+    st.markdown("""
+    #### 🏛️ Los 4 Pilares de Auditoría de un CIO / Analista de Riesgo Privado:
+    1. **Pricing Power & Gross Margin Moat:** Evalúa la capacidad de la empresa para trasladar la inflación a los precios finales sin perder volumen de venta (Margen Bruto > 40%).
+    2. **Debt Service Coverage & Solventing:** Controla la relación Deuda/Patrimonio (Debt to Equity < 1.5) para evitar crisis de liquidez en entornos de tasas de interés elevadas.
+    3. **Free Cash Flow Yield & Profitability:** Mide la conversión limpia de beneficios contables en efectivo libre disponible para distribución o reinversión.
+    4. **Sensibilidad Macro & Sustitutividad:** Resistencia del activo ante variaciones en el Dólar (DXY), Petróleo y Tasas del Tesoro a 10 años.
+    """)
+
+    st.markdown("---")
+    st.markdown("##### 📋 Matriz de Indicadores Fundamentales de la Watchlist")
+
+    tickers_fund = ["SPY", "QQQ", "NVDA", "AAPL", "MSFT", "AMZN", "TSLA", "META", "MELI", "OKLO", "QCOM", "AVGO", "YPF", "TGS", "MU", "NU", "ASML", "IREN", "VIST", "PAMP", "TSM", "BRK-B"]
+    
+    if st.button("📊 Cargar Datos Fundamentales de la Watchlist", type="secondary"):
+        fund_list = []
+        progress_f = st.progress(0)
+        for idx, tk_f in enumerate(tickers_fund):
+            res_f = obtener_fundamentales_ticker(tk_f)
+            if res_f:
+                fund_list.append(res_f)
+            progress_f.progress((idx + 1) / len(tickers_fund))
+        progress_f.empty()
+
+        if fund_list:
+            df_fund = pd.DataFrame(fund_list)
+            st.dataframe(df_fund, use_container_width=True)
+
+    st.markdown("---")
+    st.markdown("##### 🔍 Profiler Fundamental e Inspección de Pricing Power por Activo")
+    
+    tk_selected = st.selectbox("Elegí un activo para auditar sus métricas fundamentales y noticias corporativas:", tickers_fund)
+    
+    fund_single = obtener_fundamentales_ticker(tk_selected)
+    if fund_single:
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("Pricing Power Index", fund_single["Pricing Power Index"])
+        c2.metric("Gross Margin (%)", fund_single["Gross Margin (%)"])
+        c3.metric("Free Cash Flow ($B)", f"${fund_single['Free Cash Flow ($B)']} B")
+        c4.metric("Forward P/E", fund_single["Forward P/E"])
+
+        c5, c6, c7, c8 = st.columns(4)
+        c5.metric("Sector", fund_single["Sector"])
+        c6.metric("Market Cap ($B)", f"${fund_single['Market Cap ($B)']} B")
+        c7.metric("Profit Margin (%)", fund_single["Profit Margin (%)"])
+        c8.metric("Debt / Equity Ratio", fund_single["Debt / Equity"])
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown(f"##### 📰 Noticias Corporativas & Catalizadores Fundamentales — {tk_selected}")
+    single_news = obtener_noticias_ticker(tk_selected)
+    if single_news:
+        for item in single_news:
+            st.markdown(f"""
+            <div class="news-card">
+                <a href="{item.get('link', '#')}" target="_blank" style="color:#d4af37; text-decoration:none; font-weight:600; font-size:0.9rem;">{item.get('title', 'Noticia sin título')}</a>
+                <p style="color:#a1a1aa; font-size:0.75rem; margin-top:4px;">Fuente: {item.get('publisher', 'Financial News')} | Publicado recientemente</p>
+            </div>
+            """, unsafe_allow_html=True)
+    else:
+        st.info("Sin noticias fundamentales recientes registradas para este activo.")
+
+# ==============================================================================
+# TAB 3: MACRO & COMMODITIES
 # ==============================================================================
 with tab_macro:
     st.markdown("<h3 class='gold-accent'>MONITOREO MACROECONÓMICO & SECTOR ENERGÍA</h3>", unsafe_allow_html=True)
@@ -584,7 +728,7 @@ with tab_macro:
         st.plotly_chart(fig_macro, use_container_width=True)
 
 # ==============================================================================
-# TAB 3: RENTA FIJA & INFLACIÓN EE.UU.
+# TAB 4: RENTA FIJA & INFLACIÓN EE.UU.
 # ==============================================================================
 with tab_rentafija:
     st.markdown("<h3 class='gold-accent'>CALCULADORA DE RENTA FIJA & RENTABILIDAD REAL</h3>", unsafe_allow_html=True)
@@ -656,7 +800,7 @@ with tab_rentafija:
     st.plotly_chart(fig_rf, use_container_width=True)
 
 # ==============================================================================
-# TAB 4: RIESGO DE CARTERA & MONTE CARLO
+# TAB 5: RIESGO DE CARTERA & MONTE CARLO
 # ==============================================================================
 with tab_risk:
     st.markdown("<h3 class='gold-accent'>MOTOR DE RIESGO INSTITUCIONAL & SIMULACIÓN MONTE CARLO</h3>", unsafe_allow_html=True)
@@ -755,3 +899,5 @@ with tab_risk:
                 height=500, margin=dict(l=20, r=20, t=40, b=20)
             )
             st.plotly_chart(fig_corr, use_container_width=True)
+    
+   
