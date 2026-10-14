@@ -49,15 +49,16 @@ telegram_token = st.sidebar.text_input("Bot Token", type="password")
 telegram_chat_id = st.sidebar.text_input("Chat ID")
 
 # ------------------------------------------------------------------------------
-# INTERFAZ PRINCIPAL
+# INTERFAZ PRINCIPAL CON WATCHLIST FIJA
 # ------------------------------------------------------------------------------
 st.title("⚡ Master Quantitative Market Scanner Pro")
 st.caption("Donchian Volatility Breakout + Triple Barrier + Meta-Labeling ML + Régimen Macro SPY + Kelly Fraccionado")
 
+# Watchlist Fija personalizada
 tickers_input = st.text_area(
-    "Tickers a evaluar (separados por coma):",
-    value="SPY, QQQ, NVDA, AAPL, MSFT, AMZN, TSLA, META, BTC-USD, ETH-USD, GGAL, MELI",
-    height=80
+    "Watchlist de Activos Monitoreados (separados por coma):",
+    value="SPY, QQQ, NVDA, AAPL, MSFT, AMZN, TSLA, META, BTC-USD, MELI, OKLO, QCOM, AVGO, YPF, TGS, MU, NU, ASML, IREN, VIST, VT, PAMP, IBIT, TSM, SPCX, BRK-B",
+    height=100
 )
 
 # ------------------------------------------------------------------------------
@@ -188,20 +189,16 @@ def procesar_activo(ticker, capital_val, riesgo_base_val, threshold_val, regime_
         precio_sl = precio_cierre - distancia_sl_pts
         precio_tp = precio_cierre + (atr_actual * pt_mult)
 
-        # ----------------------------------------------------------------------
-        # CÁLCULO DE TAMAÑO DE POSICIÓN DINÁMICO (HALF-KELLY + ATR SIZING)
-        # ----------------------------------------------------------------------
-        b_payoff = pt_mult / sl_mult  # Ratio Ganancia/Pérdida (1.8 / 1.2 = 1.5)
+        # Dimensionamiento Dinámico (Half-Kelly + ATR Sizing)
+        b_payoff = pt_mult / sl_mult
         p = ml_prob
         
-        # Fórmula de Kelly: f* = (p * b - (1 - p)) / b
         f_kelly = (p * b_payoff - (1 - p)) / b_payoff if b_payoff > 0 else 0
         half_kelly_frac = max(0.0, 0.5 * f_kelly)
 
         if kelly_enabled and p >= threshold_val:
-            # Escalamos el riesgo base proporcionalmente al nivel de confianza ML
-            factor_escalado = half_kelly_frac / 0.125  # Referencia normalizada para 55%-60%
-            factor_escalado = max(0.5, min(2.5, factor_escalado))  # Acotado entre 0.5x y 2.5x del riesgo base
+            factor_escalado = half_kelly_frac / 0.125
+            factor_escalado = max(0.5, min(2.5, factor_escalado))
             riesgo_efectivo_pct = riesgo_base_val * factor_escalado
         else:
             riesgo_efectivo_pct = riesgo_base_val
@@ -210,7 +207,6 @@ def procesar_activo(ticker, capital_val, riesgo_base_val, threshold_val, regime_
         unidades = math.floor(riesgo_usd / distancia_sl_pts) if distancia_sl_pts > 0 else 0
         monto_total_usd = unidades * precio_cierre
 
-        # Clasificación del Estado con Filtro de Régimen y ML
         if not regime_ok and activar_filtro_regimen and primary_signal == 1:
             estado_str = "⛔ BLOQUEADO (MERCADO BAJISTA)"
             prioridad = 4
@@ -292,7 +288,7 @@ def crear_grafico_donchian(ticker, df_hist, precio_sl, precio_tp, estado):
     return fig
 
 # ------------------------------------------------------------------------------
-# VERIFICACIÓN DE RÉGIMEN DE MERCADO AL INICIAR
+# VERIFICACIÓN DE RÉGIMEN DE MERCADO
 # ------------------------------------------------------------------------------
 regimen_info = obtener_regimen_mercado()
 if activar_filtro_regimen:
@@ -328,7 +324,6 @@ if st.button("🚀 Ejecutar Escáner Cuantitativo Avanzado", type="primary", use
             df_res = pd.DataFrame(resultados).sort_values(by=["_prioridad", "_prob_raw"], ascending=[True, False])
             df_activas = df_res[df_res['_prioridad'] == 1]
 
-            # Tarjetas con métricas
             col1, col2, col3 = st.columns(3)
             col1.metric("Activos Escaneados", len(lista_tickers))
             col2.metric("Oportunidades Aprobadas", len(df_activas))
